@@ -3,37 +3,33 @@ import {
   View,
   ActivityIndicator,
   StyleSheet,
-  Text,
-  TouchableOpacity,
-  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "../lib/AuthContext";
-import { useLanguage } from "../LanguageContext";
 import LanguageToggle from "../components/LanguageToggle";
-
-interface AuthUser {
-  role?: string;
-}
 
 export default function Index() {
   const router = useRouter();
   const {
     isAuthenticated,
     loading,
-    user,
   } = useAuth() as {
     isAuthenticated: boolean;
     loading: boolean;
-    user: AuthUser | null;
   };
-  const { t } = useLanguage();
 
   useEffect(() => {
-    if (!loading && isAuthenticated) {
-      router.replace("/Member/MemberDashboard" as any);
+    if (loading) {
+      return;
     }
-  }, [loading, isAuthenticated, user]);
+
+    if (isAuthenticated) {
+      router.replace("/Member/MemberDashboard" as any);
+      return;
+    }
+
+    router.replace("/WelcomeScreen" as any);
+  }, [loading, isAuthenticated, router]);
 
   if (loading) {
     return (
@@ -48,68 +44,18 @@ export default function Index() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles.loading}>
       <LanguageToggle />
-      <Image
-        source={require("../assets/images/logo2.png")}
-        style={styles.logoImage}
-        resizeMode="contain"
-      />
-
-      <Text style={styles.title}>{t("login_title")}</Text>
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => router.push("/Member/MemberLoginScreen" as any)}
-      >
-        <Text style={styles.buttonText}>Member Login</Text>
-      </TouchableOpacity>
+      <ActivityIndicator size="large" color="#111827" />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "flex-start",
-    alignItems: "flex-start",
-    backgroundColor: "#F3F4F6",
-    paddingHorizontal: 24,
-    paddingTop: 80,
-  },
   loading: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#F3F4F6",
-  },
-  logoImage: {
-    marginTop: 100,
-    width: 120,
-    height: 80,
-    marginBottom: 24,
-    marginLeft: 10,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    marginBottom: 24,
-    color: "#111827",
-    marginLeft: 10,
-  },
-  button: {
-    marginLeft: 10,
-    marginTop: 8,
-    height: 48,
-    width: "95%",
-    borderRadius: 12,
-    backgroundColor: "#000000",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
   },
 });

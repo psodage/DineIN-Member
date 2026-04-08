@@ -19,6 +19,10 @@ function signMemberToken(memberId) {
   });
 }
 
+function normalizePhoneDigits(raw) {
+  return String(raw ?? "").replace(/\D/g, "");
+}
+
 exports.memberLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -66,6 +70,63 @@ exports.memberLogin = async (req, res) => {
     });
   } catch (error) {
     console.error("Member login error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.memberLoginPhone = async (req, res) => {
+  try {
+    const { phone, password } = req.body;
+
+    if (!phone || !password) {
+      return res.status(400).json({ message: "Phone and password are required" });
+    }
+
+    const phoneRaw = String(phone).trim();
+    const digits = normalizePhoneDigits(phoneRaw);
+    if (!digits) {
+      return res.status(400).json({ message: "Phone and password are required" });
+    }
+
+    // Best-effort matching: allow raw, digits-only, and +digits stored forms.
+    const member = await Member.findOne({
+      phone: { $in: [phoneRaw, digits, `+${digits}`] },
+    }).lean();
+    if (!member) return res.status(400).json({ message: "Member not found" });
+
+    const user = await User.findOne({ _id: member.userId, role: "member" });
+    if (!user) return res.status(400).json({ message: "Member not found" });
+
+    const stored = String(user.password || "");
+    const input = String(password || "");
+    const looksHashed =
+      stored.startsWith("$2a$") || stored.startsWith("$2b$") || stored.startsWith("$2y$");
+
+    const ok = looksHashed ? await bcrypt.compare(input, stored) : stored.trim() === input.trim();
+    if (!ok) return res.status(400).json({ message: "Invalid credentials" });
+
+    const token = signMemberToken(member._id);
+
+    // Single active session: overwrite any previous token.
+    user.activeSessionToken = token;
+    await user.save();
+
+    return res.json({
+      token,
+      user: {
+        id: member._id,
+        email: user.email,
+        name: member.name,
+        roomOwnerName: member.roomOwnerName,
+        mealPlan: member.mealPlan,
+        mealPlanMr: member.mealPlanMr || mealPlanMrFor(member.mealPlan),
+        status: member.status,
+        statusMr: member.statusMr || statusMrFor(member.status),
+        role: "member",
+      },
+    });
+  } catch (error) {
+    console.error("Member login phone error:", error);
     return res.status(500).json({ message: "Server error" });
   }
 };

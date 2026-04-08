@@ -40,6 +40,7 @@ app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/menu", require("./routes/menuRoutes"));
 app.use("/api/polls", require("./routes/pollRoutes"));
 app.use("/api/members", require("./routes/memberRoutes"));
+app.use("/api/pending-registrations", require("./routes/pendingRegistrationRoutes"));
 // Alias for normalized member endpoints
 app.use("/api/member", require("./routes/memberRoutes"));
 // Backward-compatible alias (older app builds may still call /api/students)

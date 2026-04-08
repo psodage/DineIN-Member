@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert } from "react-native";
 import { router } from "expo-router";
-import { setOnAuthError } from "./api";
+import { setAuthToken, setOnAuthError } from "./api";
 import api from "./api";
 
 /** Ensure member screens can rely on `user.id` (some stored payloads only had `_id`). */
@@ -33,9 +33,11 @@ export const AuthProvider = ({ children }) => {
         AsyncStorage.getItem("token"),
         AsyncStorage.getItem("user"),
       ]);
+      setAuthToken(storedToken);
       setToken(storedToken);
       setUser(storedUser ? normalizeStoredUser(JSON.parse(storedUser)) : null);
     } catch (e) {
+      setAuthToken(null);
       setToken(null);
       setUser(null);
     } finally {
@@ -52,6 +54,7 @@ export const AuthProvider = ({ children }) => {
       // On any 401, clear in-memory auth state too (not only AsyncStorage)
       // so the UI stops calling protected endpoints with a stale token.
       await AsyncStorage.multiRemove(["token", "user"]);
+      setAuthToken(null);
       setToken(null);
       setUser(null);
 
@@ -62,10 +65,21 @@ export const AuthProvider = ({ children }) => {
     return () => setOnAuthError(null);
   }, []);
 
-  const login = async (newToken, newUser) => {
+  /**
+   * Log in the user.
+   * If `remember` is false, auth is kept in-memory only (not persisted).
+   */
+  const login = async (newToken, newUser, options = {}) => {
+    const remember = options?.remember === true;
     const normalized = normalizeStoredUser(newUser);
-    await AsyncStorage.setItem("token", newToken);
-    await AsyncStorage.setItem("user", JSON.stringify(normalized || newUser));
+    setAuthToken(newToken);
+    if (remember) {
+      await AsyncStorage.setItem("token", newToken);
+      await AsyncStorage.setItem("user", JSON.stringify(normalized || newUser));
+    } else {
+      // Ensure any previous remembered session is cleared.
+      await AsyncStorage.multiRemove(["token", "user"]);
+    }
     setToken(newToken);
     setUser(normalized || newUser);
   };
@@ -80,6 +94,7 @@ export const AuthProvider = ({ children }) => {
       // ignore
     }
     await AsyncStorage.multiRemove(["token", "user"]);
+    setAuthToken(null);
     setToken(null);
     setUser(null);
   };

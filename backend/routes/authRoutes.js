@@ -7,7 +7,7 @@ const Member = require("../models/Member");
 const Otp = require("../models/Otp");
 const { sendOtpEmail, OTP_EXPIRY_MINUTES } = require("../utils/email");
 const { otpRateLimiter } = require("../middleware/rateLimiter");
-const { memberLogin, memberLogout } = require("../controllers/authController");
+const { memberLogin, memberLoginPhone, memberLogout } = require("../controllers/authController");
 const { authenticate, requireMember, requireAdmin } = require("../middleware/authMiddleware");
 
 const router = express.Router();
@@ -413,6 +413,7 @@ router.get("/admin-account-bounds", authenticate, requireAdmin, async (req, res)
 
 // Member login (single active session enforced via activeSessionToken)
 router.post("/member-login", memberLogin);
+router.post("/member-login-phone", memberLoginPhone);
 
 // Member logout (clears activeSessionToken)
 router.post("/member-logout", authenticate, requireMember, memberLogout);

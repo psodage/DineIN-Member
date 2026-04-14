@@ -16,30 +16,6 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "../../lib/api";
 
-const DUMMY_SNACKS = [
-  {
-    _id: "1",
-    name: "Tea",
-    price: 10,
-    category: "Beverage",
-    availability: true,
-  },
-  {
-    _id: "2",
-    name: "Samosa",
-    price: 20,
-    category: "Food",
-    availability: true,
-  },
-  {
-    _id: "3",
-    name: "Maggi",
-    price: 30,
-    category: "Food",
-    availability: true,
-  },
-];
-
 const SnackOrderPage = () => {
   const router = useRouter();
 
@@ -112,18 +88,14 @@ const SnackOrderPage = () => {
         (s) => s.availability !== false && getSnackStock(s) >= 1
       );
 
-      if (!items.length) {
-        items = DUMMY_SNACKS;
-      }
-
       setSnacks(items);
     } catch (error) {
       console.error("Failed to load snack products:", error);
       Alert.alert(
         "Error",
-        error?.response?.data?.message || "Failed to load snacks. Showing sample data."
+        error?.response?.data?.message || "Failed to load snacks."
       );
-      setSnacks(DUMMY_SNACKS);
+      setSnacks([]);
     } finally {
       setLoading(false);
     }

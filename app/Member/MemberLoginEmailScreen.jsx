@@ -207,7 +207,7 @@ export default function MemberLoginScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() =>
-                  Alert.alert("", "Reset Password Is currently not avaliable")
+                  Alert.alert("", "Reset Password Is currently unavaliable")
                 }
                 hitSlop={{ top: 8, bottom: 8 }}
               >
@@ -264,18 +264,23 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   topHeroBg: {
-    paddingHorizontal: 20,
+    marginTop: 40,
+    paddingHorizontal: 0,
     paddingBottom: 14,
-    minHeight: 260,
+    height: 280,
   },
   topHeroOverlay: {
-    flex: 1,
+    marginTop: -42,
+    paddingTop: 10,
     backgroundColor: "rgba(0, 0, 0, 0.28)",
-    marginHorizontal: -20,
+    marginHorizontal: 0,
     paddingHorizontal: 20,
     paddingBottom: 14,
+    // Match height with the hero container
+    height:280,
   },
   topBrand: {
+    marginTop:20,
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",

@@ -197,9 +197,7 @@ const MemberProfile = () => {
           <View style={styles.profileHeaderRow}>
             <View style={styles.avatarStack}>
               <AvatarGradient />
-              <View style={styles.avatarEditHint}>
-                <Ionicons name="pencil" size={14} color={COLORS.primaryText} />
-              </View>
+              
             </View>
 
             <View style={styles.profileHeaderTextWrapper}>
@@ -222,17 +220,19 @@ const MemberProfile = () => {
 
         <Card>
           <SectionHeader
-            icon={<Ionicons name="person-outline" size={18} color={COLORS.primary} />}
+            icon={
+              <Ionicons
+                name="person-outline"
+                size={18}
+                color={COLORS.sectionPersonal}
+              />
+            }
             title="Personal Info"
           />
 
           <View style={styles.sectionBody}>
             <FieldRow icon="person" label="Name" value={memberName} />
-            <FieldRow
-              icon="id-card-outline"
-              label="Roll Number"
-              value={rollNumber}
-            />
+          
             <FieldRow icon="call-outline" label="Phone" value={phone} />
             <FieldRow icon="mail-outline" label="Email" value={email} />
           </View>
@@ -242,7 +242,13 @@ const MemberProfile = () => {
 
         <Card>
           <SectionHeader
-            icon={<Ionicons name="restaurant-outline" size={18} color={COLORS.primary} />}
+            icon={
+              <Ionicons
+                name="restaurant-outline"
+                size={18}
+                color={COLORS.sectionMembership}
+              />
+            }
             title="Membership Info"
           />
 
@@ -272,7 +278,13 @@ const MemberProfile = () => {
 
         <Card>
           <SectionHeader
-            icon={<Ionicons name="wallet-outline" size={18} color={COLORS.primary} />}
+            icon={
+              <Ionicons
+                name="wallet-outline"
+                size={18}
+                color={COLORS.sectionBilling}
+              />
+            }
             title="Billing Info"
           />
 
@@ -286,7 +298,11 @@ const MemberProfile = () => {
             <View style={styles.dueRow}>
               <View style={styles.dueRowLeft}>
                 <View style={styles.iconCircleSoft}>
-                  <Ionicons name="cash-outline" size={16} color={COLORS.primary} />
+                  <Ionicons
+                    name="cash-outline"
+                    size={16}
+                    color={COLORS.sectionBilling}
+                  />
                 </View>
                 <Text style={styles.fieldLabel}>Due Amount</Text>
               </View>
@@ -330,7 +346,13 @@ const MemberProfile = () => {
 
         <Card>
           <SectionHeader
-            icon={<Ionicons name="time-outline" size={18} color={COLORS.primary} />}
+            icon={
+              <Ionicons
+                name="time-outline"
+                size={18}
+                color={COLORS.sectionMonthly}
+              />
+            }
             title="Monthly Breakdown"
           />
 
@@ -385,17 +407,31 @@ export default MemberProfile;
 const COLORS = {
   bg: "#F8FAFC", // light neutral background
   card: "#FFFFFF",
-  primary: "#EA580C", // deep orange accent (use sparingly)
+  // Brand / accents (multi-color theme)
+  indigo: "#4F46E5",
+  indigoSoft: "#EEF2FF",
+  teal: "#0F766E",
+  tealSoft: "#CCFBF1",
+  amber: "#D97706",
+  amberSoft: "#FEF3C7",
+  green: "#16A34A",
+  greenSoft: "#DCFCE7",
   primaryText: "#0F172A",
   label: "#6B7280",
   divider: "#E5E7EB",
-  softAccentBg: "#F3F4F6", // neutral grey for icon circles / pills
+  softAccentBg: "#F3F4F6", // neutral grey for pills / icon circles
   softAccentBgAlt: "#E5E7EB",
   dueRed: "#DC2626",
   dueBg: "#FEE2E2",
-  activeAccent: "#EA580C", // orange for active badge text
-  activeBg: "#FFEDD5", // soft orange badge background
+  activeAccent: "#166534",
+  activeBg: "#DCFCE7",
   shadow: "#000000",
+
+  // Section accents
+  sectionPersonal: "#4F46E5",
+  sectionMembership: "#0F766E",
+  sectionBilling: "#D97706",
+  sectionMonthly: "#7C3AED",
 };
 
 function Divider() {
@@ -482,8 +518,8 @@ function AvatarGradient() {
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <Defs>
           <LinearGradient id="avatarGradient" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor={COLORS.primary} stopOpacity="1" />
-            <Stop offset="1" stopColor="#FDBA74" stopOpacity="1" />
+            <Stop offset="0" stopColor={COLORS.indigo} stopOpacity="1" />
+            <Stop offset="1" stopColor={COLORS.teal} stopOpacity="1" />
           </LinearGradient>
         </Defs>
         <Circle cx={r} cy={r} r={r} fill="url(#avatarGradient)" />
@@ -947,7 +983,7 @@ const styles = StyleSheet.create({
   progressPercent: {
     fontSize: 12,
     fontWeight: "950",
-    color: COLORS.primary,
+    color: COLORS.teal,
   },
 
   progressTrack: {
@@ -960,7 +996,7 @@ const styles = StyleSheet.create({
   progressFill: {
     height: "100%",
     borderRadius: 999,
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.teal,
   },
 
   totalValue: {

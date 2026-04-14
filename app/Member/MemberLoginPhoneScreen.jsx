@@ -233,7 +233,7 @@ export default function MemberLoginPhoneScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() =>
-                  Alert.alert("", "Reset Password Is currently not avaliable")
+                  Alert.alert("", "Reset Password Is currently unavaliable")
                 }
                 hitSlop={{ top: 8, bottom: 8 }}
               >
@@ -290,18 +290,21 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   topHeroBg: {
+    marginTop: 40,
     paddingHorizontal: 20,
     paddingBottom: 14,
-    minHeight: 260,
+    height: 280,
   },
   topHeroOverlay: {
-    flex: 1,
+    marginTop: -42,
+    height: 280,
     backgroundColor: "rgba(0, 0, 0, 0.28)",
     marginHorizontal: -20,
     paddingHorizontal: 20,
     paddingBottom: 14,
   },
   topBrand: {
+    marginTop:20,
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",

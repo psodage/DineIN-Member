@@ -95,11 +95,20 @@ const SnackOrderHistory = () => {
     const loadStudentId = async () => {
       try {
         const storedUser = await AsyncStorage.getItem("user");
-        if (!storedUser) return;
+        if (!storedUser) {
+          setError(new Error("Missing member session. Please log in again."));
+          setLoading(false);
+          return;
+        }
 
         const parsed = JSON.parse(storedUser);
         const id = parsed?._id || parsed?.id || parsed?.memberId;
-        if (id) setStudentId(String(id));
+        if (id) {
+          setStudentId(String(id));
+        } else {
+          setError(new Error("Missing member id. Please log in again."));
+          setLoading(false);
+        }
 
         const name =
           parsed?.name ||
@@ -109,6 +118,8 @@ const SnackOrderHistory = () => {
         if (name) setMemberName(String(name));
       } catch (e) {
         console.error("Failed to load studentId from storage:", e);
+        setError(e);
+        setLoading(false);
       }
     };
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import {
   Animated,
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -208,7 +209,12 @@ export default function WelcomeScreen() {
           />
           <ScaleButton
             label="Continue as Guest"
-            onPress={() => router.push("/Member/MemberLoginEmailScreen")}
+            onPress={() =>
+              Alert.alert(
+                "Unavailable",
+                "Guest Option is Currently Unavailable"
+              )
+            }
             textOnly
             colors={colors}
           />

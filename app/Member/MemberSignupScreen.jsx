@@ -447,25 +447,29 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   topHeroBg: {
+    marginTop: 40,
     paddingHorizontal: 20,
     paddingBottom: 10,
     height: 140,
   },
   topHeroOverlay: {
-    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    backgroundColor: "rgba(0, 0, 0, 0.28)",
     marginHorizontal: -20,
+    marginTop: -42,
     paddingHorizontal: 20,
     paddingBottom: 8,
+    height: 140,
    
   },
   topBrand: {
+    
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
     maxWidth: "100%",
     marginBottom: 16,
     gap: 12,
-    marginTop: 10,
+    marginTop: 30,
   },
   logoCorner: {
     width: 52,

@@ -2,9 +2,11 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Animated,
   ScrollView,
   Alert,
   Modal,
@@ -106,6 +108,16 @@ const MemberDashboard = () => {
   const insets = useSafeAreaInsets();
   const { user, loading, isAuthenticated, logout } = useAuth();
   const { t, language } = useLanguage();
+
+  const scrollRef = useRef(null);
+  const sectionYRef = useRef({ leaves: 0, bill: 0, snacks: 0 });
+  const [activeTab, setActiveTab] = useState("home");
+  const tabScaleRef = useRef({
+    home: new Animated.Value(1),
+    snacks: new Animated.Value(1),
+    leaves: new Animated.Value(1),
+    bill: new Animated.Value(1),
+  });
 
   const [billLoading, setBillLoading] = useState(true);
   const [billError, setBillError] = useState("");
@@ -839,6 +851,7 @@ const MemberDashboard = () => {
 
   const memberName = user?.name || "Rahul Patil";
   const roomOwnerName = user?.roomOwnerName || "Owner Name";
+  const restaurantLogoSource = require("../../assets/images/logo2.png");
 
   const mealPlanRaw = (
     memberFinance?.mealPlan ||
@@ -861,6 +874,120 @@ const MemberDashboard = () => {
   const billSplitActionableCount = billSplitNotifications.filter(
     (n) => n?.isActionable
   ).length;
+
+  const TopHeader = () => {
+    return (
+      <View style={[styles.topHeader, { paddingTop: insets.top + 8 }]}>
+        <View style={styles.topHeaderInner}>
+          <View style={styles.topHeaderLeft}>
+            <View style={styles.restaurantAvatar}>
+              <Image
+                source={restaurantLogoSource}
+                style={styles.restaurantAvatarImage}
+                resizeMode="cover"
+              />
+            </View>
+
+            <View style={styles.topHeaderDivider} />
+
+            <View style={styles.topHeaderTextBlock}>
+              <Text style={styles.topHeaderGreeting}>Welcome Back!</Text>
+              <Text
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={styles.topHeaderTitle}
+              >
+                {memberName}
+              </Text>
+            </View>
+          </View>
+
+          {!isInactiveMember && (
+            <TouchableOpacity
+              style={styles.topHeaderNotifBtn}
+              activeOpacity={0.85}
+              onPress={() => setSplitModalVisible(true)}
+              disabled={splitNotifLoading || billSplitNotifications.length === 0}
+            >
+              <Ionicons name="notifications-outline" size={20} color="#1F2937" />
+              {billSplitActionableCount > 0 && <View style={styles.topHeaderNotifDot} />}
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  const BottomNav = () => {
+    const primary = "#F97316";
+    const inactive = "#9CA3AF";
+
+    const animatePress = (key) => {
+      const v = tabScaleRef.current?.[key];
+      if (!v) return;
+      Animated.spring(v, {
+        toValue: 0.94,
+        useNativeDriver: true,
+        speed: 30,
+        bounciness: 6,
+      }).start(() => {
+        Animated.spring(v, {
+          toValue: 1,
+          useNativeDriver: true,
+          speed: 30,
+          bounciness: 6,
+        }).start();
+      });
+    };
+
+    const goTo = (key) => {
+      setActiveTab(key);
+      animatePress(key);
+
+      if (key === "home") {
+        scrollRef.current?.scrollTo?.({ y: 0, animated: true });
+        return;
+      }
+      if (key === "snacks") {
+        router.push("/Member/SnackOrderPage");
+        return;
+      }
+
+      const y = sectionYRef.current?.[key] ?? 0;
+      scrollRef.current?.scrollTo?.({ y: Math.max(0, y - 12), animated: true });
+    };
+
+    const item = (key, label, icon) => {
+      const isActive = activeTab === key;
+      const color = isActive ? primary : inactive;
+      const size = isActive ? 26 : 22;
+      return (
+        <TouchableOpacity
+          key={key}
+          style={styles.bottomNavItem}
+          activeOpacity={0.9}
+          onPress={() => goTo(key)}
+        >
+          <View style={styles.bottomNavItemInner}>
+            {isActive && <View style={[styles.bottomNavIndicator, { backgroundColor: primary }]} />}
+            <Animated.View style={{ transform: [{ scale: tabScaleRef.current[key] }] }}>
+              <Ionicons name={icon} size={size} color={color} />
+            </Animated.View>
+            <Text style={[styles.bottomNavLabel, { color }]}>{label}</Text>
+          </View>
+        </TouchableOpacity>
+      );
+    };
+
+    return (
+      <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+        {item("home", "Home", "home-outline")}
+        {item("snacks", "Extra Snacks", "fast-food-outline")}
+        {item("leaves", "Leaves", "calendar-outline")}
+        {item("bill", "Bill", "receipt-outline")}
+      </View>
+    );
+  };
 
   const formatSplitDateTime = (value) => {
     if (!value) return "";
@@ -1159,87 +1286,15 @@ const MemberDashboard = () => {
 
   return (
     <View style={styles.container}>
+      <TopHeader />
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + 12 },
+          { paddingTop: 12, paddingBottom: 32 + 80 + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headerRow}>
-          <View style={styles.headerTextWrapper}>
-            <Text style={styles.welcomeText}>
-              {t("Welcome") || "Welcome,"}
-            </Text>
-            <Text style={styles.memberName}>{memberName}</Text>
-            <Text style={styles.memberMeta}>
-              Room Owner: {roomOwnerName}
-            
-            </Text>
-            <View style={styles.statusBadgeRow}>
-              <Text style={styles.statusLabel}>Status: </Text>
-              <View
-                style={[
-                  styles.statusBadge,
-                  isInactiveMember ? styles.statusBadgeInactive : styles.statusBadgeActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.statusBadgeText,
-                    isInactiveMember
-                      ? styles.statusBadgeTextInactive
-                      : styles.statusBadgeTextActive,
-                  ]}
-                >
-                  {displayStatusMr(
-                    language,
-                    memberStatus,
-                    memberStatusMrDb ?? user?.statusMr
-                  )}
-                </Text>
-              </View>
-            </View>
-          </View>
-          <View style={styles.headerRightRow}>
-            {!isInactiveMember && (
-              <TouchableOpacity
-                style={styles.notificationButton}
-                activeOpacity={0.8}
-                onPress={() => setSplitModalVisible(true)}
-                disabled={splitNotifLoading || billSplitNotifications.length === 0}
-              >
-                <Ionicons
-                  name="notifications-outline"
-                  size={24}
-                  color="#111827"
-                />
-                {billSplitActionableCount > 0 && (
-                  <View style={styles.notificationBadge}>
-                    <Text style={styles.notificationBadgeText}>
-                      {billSplitActionableCount > 9
-                        ? "9+"
-                        : billSplitActionableCount}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={styles.avatarWrapper}
-              activeOpacity={0.8}
-              onPress={() => router.push("/Member/MemberProfile")}
-            >
-              <Ionicons
-                name="person-circle-outline"
-                size={48}
-                color="#ECFDF5"
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {isInactiveMember ? (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -1541,7 +1596,12 @@ const MemberDashboard = () => {
               )}
             </View>
 
-            <View style={styles.card}>
+            <View
+              style={styles.card}
+              onLayout={(e) => {
+                sectionYRef.current.leaves = e.nativeEvent.layout.y;
+              }}
+            >
               <View style={styles.cardHeader}>
                 <View style={styles.cardIconWrapper}>
                   <Ionicons name="calendar-outline" size={22} color="#065F46" />
@@ -1624,7 +1684,12 @@ const MemberDashboard = () => {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.card}>
+            <View
+              style={styles.card}
+              onLayout={(e) => {
+                sectionYRef.current.bill = e.nativeEvent.layout.y;
+              }}
+            >
               <View style={styles.cardHeader}>
                 <View style={styles.cardIconWrapper}>
                   <Ionicons name="wallet" size={22} color="#064E3B" />
@@ -1744,7 +1809,12 @@ const MemberDashboard = () => {
               )}
             </View>
 
-            <View style={styles.card}>
+            <View
+              style={styles.card}
+              onLayout={(e) => {
+                sectionYRef.current.snacks = e.nativeEvent.layout.y;
+              }}
+            >
               <View style={styles.cardHeader}>
                 <View style={styles.cardIconWrapper}>
                   <Ionicons name="fast-food-outline" size={22} color="#111827" />
@@ -1778,6 +1848,7 @@ const MemberDashboard = () => {
           <Text style={styles.logoutText}>{t("logout")}</Text>
         </TouchableOpacity>
       </ScrollView>
+      <BottomNav />
 
       <Modal
         visible={pollModalVisible}
@@ -2076,74 +2147,130 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 32,
   },
-  headerRow: {
+
+  topHeader: {
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  topHeaderInner: {
+    height: 62,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
   },
-  headerTextWrapper: {
-    flex: 1,
-    marginRight: 16,
-  },
-  welcomeText: {
-    fontSize: 14,
-    color: "#6B7280",
-    marginBottom: 4,
-  },
-  memberName: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 4,
-  },
-  memberMeta: {
-    fontSize: 13,
-    color: "#9CA3AF",
-  },
-  statusBadgeRow: {
-    marginTop: 6,
+  topHeaderLeft: {
     flexDirection: "row",
     alignItems: "center",
+    flex: 1,
+    paddingRight: 10,
   },
-  statusLabel: {
-    fontSize: 13,
-    color: "#6B7280",
-    marginRight: 4,
+  restaurantAvatar: {
+    width: 57,
+    height: 37,
   },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
+  restaurantAvatarImage: {
+    width: "100%",
+    height: "100%",
+    
   },
-  statusBadgeActive: {
-    backgroundColor: "#DCFCE7",
+  restaurantAvatarFallback: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F9FAFB",
   },
-  statusBadgeInactive: {
-    backgroundColor: "#FEE2E2",
+  topHeaderTextBlock: {
+    justifyContent: "center",
   },
-  statusBadgeText: {
+  topHeaderDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: "#E5E7EB",
+    marginHorizontal: 12,
+  },
+  topHeaderGreeting: {
     fontSize: 12,
     fontWeight: "600",
+    color: "#9CA3AF",
+    marginBottom: 2,
   },
-  statusBadgeTextActive: {
-    color: "#166534",
+  topHeaderTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#1F2937",
   },
-  statusBadgeTextInactive: {
-    color: "#B91C1C",
-  },
-  avatarWrapper: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#111827",
+  topHeaderNotifBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
     shadowRadius: 6,
-    elevation: 4,
+    elevation: 3,
+  },
+  topHeaderNotifDot: {
+    position: "absolute",
+    width: 9,
+    height: 9,
+    borderRadius: 999,
+    backgroundColor: "#EF4444",
+    top: -2,
+    right: -2,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+
+  bottomNav: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    height: 72,
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingTop: 10,
+    paddingHorizontal: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  bottomNavItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bottomNavItemInner: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bottomNavIndicator: {
+    width: 22,
+    height: 4,
+    borderRadius: 999,
+    marginBottom: 6,
+  },
+  bottomNavLabel: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: "700",
   },
   card: {
     backgroundColor: "#FFFFFF",
@@ -2475,38 +2602,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 
-  headerRightRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  notificationButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "transparent",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "transparent",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  notificationBadge: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    backgroundColor: "#DC2626",
-    borderRadius: 999,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  notificationBadgeText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "800",
-  },
+  // NOTE: legacy header styles removed (replaced by `topHeader*` styles).
 
   modalOverlay: {
     flex: 1,

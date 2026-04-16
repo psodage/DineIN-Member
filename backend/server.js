@@ -52,6 +52,8 @@ app.use("/api/snack-products", require("./routes/snackProductRoutes"));
 app.use("/api/snack-orders", require("./routes/snackOrderRoutes"));
 app.use("/api/bill-splits", require("./routes/billSplitRoutes"));
 app.use("/api/leave", require("./routes/leaveRoutes"));
+app.use("/api/meal-types", require("./routes/mealTypeRoutes"));
+app.use("/api/member-monthly-due", require("./routes/MemberMonthlyDue"));
 
 const PORT = process.env.PORT || 5000;
 

@@ -18,7 +18,7 @@ import { useLanguage } from "../../LanguageContext";
 import api from "../../lib/api";
 import { displayMealPlanMr, displayStatusMr } from "../../lib/memberLabelsMr";
 
-const MemberProfile = () => {
+const MemberProfile = ({ embedded = false, mode = "profile" }) => {
   const router = useRouter();
   const { user, loading, isAuthenticated } = useAuth();
   const { language } = useLanguage();
@@ -76,19 +76,25 @@ const MemberProfile = () => {
   }
 
   if (profileLoading) {
+    const loadingContent = (
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <ProfileSkeleton />
+      </ScrollView>
+    );
+
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.backButtonPlaceholder} />
-          <Text style={styles.headerTitle}>Profile</Text>
-          <View style={styles.headerRightSpacer} />
-        </View>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <ProfileSkeleton />
-        </ScrollView>
+        {!embedded && (
+          <View style={styles.header}>
+            <View style={styles.backButtonPlaceholder} />
+            <Text style={styles.headerTitle}>Profile</Text>
+            <View style={styles.headerRightSpacer} />
+          </View>
+        )}
+        {loadingContent}
       </SafeAreaView>
     );
   }
@@ -168,113 +174,103 @@ const MemberProfile = () => {
   })();
 
   const percentPaid = Math.round(paymentProgressRatio * 100);
+  const billingOnly = mode === "bill";
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color={COLORS.primaryText} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <View style={styles.headerRightSpacer} />
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+  const content = (
+    <ScrollView
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
         {error && (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
 
-        <Card>
-          <View style={styles.profileHeaderRow}>
-            <View style={styles.avatarStack}>
-              <AvatarGradient />
-              
-            </View>
+        {!billingOnly && (
+          <>
+            <Card>
+              <View style={styles.profileHeaderRow}>
+                <View style={styles.avatarStack}>
+                  <AvatarGradient />
+                </View>
 
-            <View style={styles.profileHeaderTextWrapper}>
-              <View style={styles.nameRow}>
-                <Text style={styles.memberName}>{memberName}</Text>
-                <StatusBadge
-                  variant={membershipBadgeVariant}
-                  label={status || (isMembershipActive ? "Active" : "Inactive")}
-                />
+                <View style={styles.profileHeaderTextWrapper}>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.memberName}>{memberName}</Text>
+                    <StatusBadge
+                      variant={membershipBadgeVariant}
+                      label={status || (isMembershipActive ? "Active" : "Inactive")}
+                    />
+                  </View>
+
+                  <Text style={styles.memberMeta}>
+                    {roomOwnerName !== "N/A" ? `Room Owner: ${roomOwnerName}` : ""}
+                  </Text>
+                </View>
               </View>
+            </Card>
 
-              <Text style={styles.memberMeta}>
-                {roomOwnerName !== "N/A" ? `Room Owner: ${roomOwnerName}` : ""}
-              </Text>
-            </View>
-          </View>
-        </Card>
+            <View style={styles.sectionSpacer} />
 
-        <View style={styles.sectionSpacer} />
-
-        <Card>
-          <SectionHeader
-            icon={
-              <Ionicons
-                name="person-outline"
-                size={18}
-                color={COLORS.sectionPersonal}
+            <Card>
+              <SectionHeader
+                icon={
+                  <Ionicons
+                    name="person-outline"
+                    size={18}
+                    color={COLORS.sectionPersonal}
+                  />
+                }
+                title="Personal Info"
               />
-            }
-            title="Personal Info"
-          />
 
-          <View style={styles.sectionBody}>
-            <FieldRow icon="person" label="Name" value={memberName} />
-          
-            <FieldRow icon="call-outline" label="Phone" value={phone} />
-            <FieldRow icon="mail-outline" label="Email" value={email} />
-          </View>
-        </Card>
+              <View style={styles.sectionBody}>
+                <FieldRow icon="person" label="Name" value={memberName} />
+                <FieldRow icon="call-outline" label="Phone" value={phone} />
+                <FieldRow icon="mail-outline" label="Email" value={email} />
+              </View>
+            </Card>
 
-        <View style={styles.sectionSpacer} />
+            <View style={styles.sectionSpacer} />
 
-        <Card>
-          <SectionHeader
-            icon={
-              <Ionicons
-                name="restaurant-outline"
-                size={18}
-                color={COLORS.sectionMembership}
+            <Card>
+              <SectionHeader
+                icon={
+                  <Ionicons
+                    name="restaurant-outline"
+                    size={18}
+                    color={COLORS.sectionMembership}
+                  />
+                }
+                title="Membership Info"
               />
-            }
-            title="Membership Info"
-          />
 
-          <View style={styles.sectionBody}>
-            <FieldRow
-              icon="calendar-outline"
-              label="Joining Date"
-              value={joiningDate}
-            />
+              <View style={styles.sectionBody}>
+                <FieldRow
+                  icon="calendar-outline"
+                  label="Joining Date"
+                  value={joiningDate}
+                />
 
-            <View style={styles.pillRow}>
-              <Text style={styles.fieldLabel}>Status</Text>
-              <StatusBadge
-                variant={membershipBadgeVariant}
-                label={status || (isMembershipActive ? "Active" : "Inactive")}
-              />
-            </View>
+                <View style={styles.pillRow}>
+                  <Text style={styles.fieldLabel}>Status</Text>
+                  <StatusBadge
+                    variant={membershipBadgeVariant}
+                    label={status || (isMembershipActive ? "Active" : "Inactive")}
+                  />
+                </View>
 
-            <View style={styles.pillRow}>
-              <Text style={styles.fieldLabel}>Meal Plan</Text>
-              <PillBadge label={mealPlanPillLabel} />
-            </View>
-          </View>
-        </Card>
+                <View style={styles.pillRow}>
+                  <Text style={styles.fieldLabel}>Meal Plan</Text>
+                  <PillBadge label={mealPlanPillLabel} />
+                </View>
+              </View>
+            </Card>
 
-        <View style={styles.sectionSpacer} />
+            <View style={styles.sectionSpacer} />
+          </>
+        )}
 
         <Card>
           <SectionHeader
@@ -398,6 +394,25 @@ const MemberProfile = () => {
           </View>
         </Card>
       </ScrollView>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {!embedded && (
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color={COLORS.primaryText} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Profile</Text>
+          <View style={styles.headerRightSpacer} />
+        </View>
+      )}
+
+      {content}
     </SafeAreaView>
   );
 };

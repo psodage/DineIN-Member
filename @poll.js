@@ -10,7 +10,7 @@ import api from "./lib/api";
  */
 
 function normalizeOption(option) {
-  const key = String(option?.key ?? "").trim();
+  const key = String(option?.key ?? "").trim().toLowerCase();
   if (!key) return null;
 
   const label = String(option?.label ?? option?.labelMr ?? "").trim();
@@ -27,6 +27,22 @@ function normalizePoll(pollSummary) {
     ? pollSummary.options.map(normalizeOption).filter(Boolean)
     : [];
 
+  const rawCounts = pollSummary?.counts;
+  const counts =
+    rawCounts && typeof rawCounts === "object" && !Array.isArray(rawCounts)
+      ? Object.fromEntries(
+          Object.entries(rawCounts)
+            .map(([k, v]) => {
+              const n = typeof v === "number" ? v : Number(v);
+              if (!Number.isFinite(n)) return null;
+              const key = String(k ?? "").trim().toLowerCase();
+              if (!key) return null;
+              return [key, n];
+            })
+            .filter(Boolean)
+        )
+      : null;
+
   const expiresAt = pollSummary?.expiresAt ? new Date(pollSummary.expiresAt) : null;
   const isActive = expiresAt ? expiresAt.getTime() > Date.now() : true;
 
@@ -36,6 +52,7 @@ function normalizePoll(pollSummary) {
     question: String(pollSummary?.question ?? "").trim() || "Meal Preference",
     options,
     myVote: pollSummary?.myVote ? String(pollSummary.myVote) : null,
+    counts,
     isActive,
     createdAt: pollSummary?.createdAt ?? null,
     updatedAt: pollSummary?.updatedAt ?? null,

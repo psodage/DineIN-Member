@@ -69,6 +69,11 @@ export default function MemberPollCard({ date = new Date() }) {
   const hasVoted = !!poll?.myVote;
   const canVote = !!poll && !hasVoted && !!selectedOptionKey && !submitting;
 
+  const getOptionCount = (optionKey) => {
+    if (!poll?.counts) return null;
+    return typeof poll.counts[optionKey] === "number" ? poll.counts[optionKey] : 0;
+  };
+
   const onSelectOption = (key) => {
     if (hasVoted) return; // backend only allows one vote per day
     setSelectedOptionKey(key);
@@ -127,6 +132,7 @@ export default function MemberPollCard({ date = new Date() }) {
           <View style={styles.optionsWrap}>
             {poll.options.map((opt) => {
               const selected = opt.key === selectedOptionKey;
+              const count = hasVoted ? getOptionCount(opt.key) : null;
 
               return (
                 <TouchableOpacity
@@ -140,15 +146,32 @@ export default function MemberPollCard({ date = new Date() }) {
                     hasVoted && !selected && styles.optionBoxDisabled,
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.optionLabel,
-                      selected && styles.optionLabelSelected,
-                      hasVoted && !selected && styles.optionLabelDisabled,
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
+                  <View style={styles.optionRow}>
+                    <Text
+                      style={[
+                        styles.optionLabel,
+                        selected && styles.optionLabelSelected,
+                        hasVoted && !selected && styles.optionLabelDisabled,
+                      ]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {opt.label}
+                    </Text>
+
+                    {hasVoted && count !== null && (
+                      <Text
+                        style={[
+                          styles.optionCountText,
+                          selected
+                            ? styles.optionCountTextSelected
+                            : styles.optionCountTextDisabled,
+                        ]}
+                      >
+                        {count}
+                      </Text>
+                    )}
+                  </View>
                 </TouchableOpacity>
               );
             })}
@@ -157,28 +180,27 @@ export default function MemberPollCard({ date = new Date() }) {
           {!!errorText && <Text style={styles.errorText}>{errorText}</Text>}
           {!!successText && <Text style={styles.successText}>{successText}</Text>}
 
-          <View style={styles.actionsRow}>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={onPressVote}
-              disabled={!canVote}
-              style={[
-                styles.voteButton,
-                !canVote && styles.voteButtonDisabled,
-              ]}
-            >
-              <Text style={styles.voteButtonText}>Vote</Text>
-            </TouchableOpacity>
+          {!hasVoted && (
+            <View style={styles.actionsRow}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={onPressVote}
+                disabled={!canVote}
+                style={[styles.voteButton, !canVote && styles.voteButtonDisabled]}
+              >
+                <Text style={styles.voteButtonText}>Vote</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={onPressCancel}
-              style={styles.cancelButton}
-              disabled={submitting}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={onPressCancel}
+                style={styles.cancelButton}
+                disabled={submitting}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </>
       ) : (
         <View style={styles.emptyWrap}>
@@ -192,7 +214,7 @@ export default function MemberPollCard({ date = new Date() }) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    borderRadius: 0,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     padding: 16,
@@ -236,7 +258,7 @@ const styles = StyleSheet.create({
 
   optionBox: {
     backgroundColor: "#F3F4F6",
-    borderRadius: 12,
+    borderRadius: 0,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     paddingVertical: 12,
@@ -244,8 +266,8 @@ const styles = StyleSheet.create({
   },
 
   optionBoxSelected: {
-    backgroundColor: "#FFF7ED",
-    borderColor: "#F97316",
+    backgroundColor: "#ECFDF5",
+    borderColor: "#10B981",
   },
 
   optionBoxDisabled: {
@@ -259,10 +281,30 @@ const styles = StyleSheet.create({
   },
 
   optionLabelSelected: {
-    color: "#9A3412",
+    color: "#047857",
   },
 
   optionLabelDisabled: {
+    color: "#6B7280",
+  },
+
+  optionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+
+  optionCountText: {
+    fontSize: 12,
+    fontWeight: "900",
+  },
+
+  optionCountTextSelected: {
+    color: "#047857",
+  },
+
+  optionCountTextDisabled: {
     color: "#6B7280",
   },
 
@@ -298,7 +340,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 46,
     backgroundColor: "#F97316",
-    borderRadius: 14,
+    borderRadius: 0,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -316,7 +358,7 @@ const styles = StyleSheet.create({
 
   cancelButton: {
     height: 46,
-    borderRadius: 14,
+    borderRadius: 0,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     backgroundColor: "#F3F4F6",

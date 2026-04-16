@@ -14,6 +14,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../lib/AuthContext";
 import api from "../../lib/api";
 import MemberPollCard from "./MemberPollCard";
+import ActivityCalendarScreen from "./ActivityCalendarScreen";
+import MemberProfile from "./MemberProfile";
+import SnackOrderPage from "./SnackOrderPage";
 
 const MEAL_FALLBACK_TEXT = "Chapati Bhaji Amti Bhat";
 
@@ -100,7 +103,7 @@ function resolveMealText(mealText) {
 const MemberDashboard = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   const memberName = user?.name || "Member";
   const restaurantLogoSource = require("../../assets/images/logo2.png");
@@ -263,16 +266,36 @@ const MemberDashboard = () => {
             </View>
           </View>
 
-          <TouchableOpacity
-            style={styles.topHeaderNotifBtn}
-            activeOpacity={0.85}
-            onPress={() => {
-              setActiveTab("home");
-            }}
-          >
-            <Ionicons name="notifications-outline" size={20} color="#1F2937" />
-            <View style={styles.topHeaderNotifDot} />
-          </TouchableOpacity>
+          <View style={styles.topHeaderIconsRow}>
+            <TouchableOpacity
+              style={styles.topHeaderNotifBtn}
+              activeOpacity={0.85}
+              onPress={() => {
+                setActiveTab("home");
+              }}
+            >
+              <Ionicons
+                name="notifications-outline"
+                size={20}
+                color="#1F2937"
+              />
+              <View style={styles.topHeaderNotifDot} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.topHeaderNotifBtn}
+              activeOpacity={0.85}
+              onPress={async () => {
+                try {
+                  await logout?.();
+                } finally {
+                  router.replace("/");
+                }
+              }}
+            >
+              <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
@@ -303,9 +326,6 @@ const MemberDashboard = () => {
     const goTo = (key) => {
       setActiveTab(key);
       animatePress(key);
-
-      if (key === "snacks") router.push("/Member/SnackOrderPage");
-      if (key === "profile") router.push("/Member/MemberProfile");
     };
 
     const item = (key, label, icon) => {
@@ -402,19 +422,6 @@ const MemberDashboard = () => {
         <View style={styles.mealCardInner}>
           <View style={styles.mealCardTopRow}>
             <Text style={styles.mealCardTitle}>{title}</Text>
-            <TouchableOpacity
-              style={styles.mealMenuIconBtn}
-              activeOpacity={0.8}
-              onPress={() => {
-                // Intentionally no-op: optional 3-dot icon for parity with the reference UI.
-              }}
-            >
-              <Ionicons
-                name="ellipsis-horizontal"
-                size={20}
-                color={accentColor}
-              />
-            </TouchableOpacity>
           </View>
 
           <Text style={styles.mealCardSubtitle} numberOfLines={2}>
@@ -425,9 +432,24 @@ const MemberDashboard = () => {
     );
   };
 
-  return (
-    <View style={styles.container}>
-      <TopHeader />
+  const renderMiddleContent = () => {
+    if (activeTab === "leaves") {
+      return <ActivityCalendarScreen embedded />;
+    }
+
+    if (activeTab === "profile") {
+      return <MemberProfile embedded />;
+    }
+
+    if (activeTab === "snacks") {
+      return <SnackOrderPage embedded />;
+    }
+
+    if (activeTab === "bill") {
+      return <MemberProfile embedded mode="bill" />;
+    }
+
+    return (
       <ScrollView
         style={styles.bodyScroll}
         contentContainerStyle={styles.bodyContent}
@@ -496,6 +518,13 @@ const MemberDashboard = () => {
           <MemberPollCard />
         </View>
       </ScrollView>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <TopHeader />
+      <View style={styles.middleArea}>{renderMiddleContent()}</View>
       <BottomNav />
     </View>
   );
@@ -511,6 +540,9 @@ const styles = StyleSheet.create({
   bodyScroll: {
     flex: 1,
   },
+  middleArea: {
+    flex: 1,
+  },
   bodyContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
@@ -518,7 +550,7 @@ const styles = StyleSheet.create({
   },
   sectionCard: {
     backgroundColor: "transparent",
-    borderRadius: 18,
+    borderRadius: 0,
     padding: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 0 },
@@ -534,8 +566,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 4,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
     backgroundColor: "#F97316",
   },
   sectionHeader: {
@@ -547,7 +579,7 @@ const styles = StyleSheet.create({
   sectionIconWrap: {
     width: 34,
     height: 34,
-    borderRadius: 17,
+    borderRadius: 0,
     backgroundColor: "#FFF7ED",
     alignItems: "center",
     justifyContent: "center",
@@ -589,7 +621,7 @@ const styles = StyleSheet.create({
   },
   mealItemCard: {
     backgroundColor: "#FFFBF7",
-    borderRadius: 14,
+    borderRadius: 0,
     borderWidth: 1,
     borderColor: "#FFEDD5",
     paddingHorizontal: 12,
@@ -619,7 +651,7 @@ const styles = StyleSheet.create({
   weekStripPanel: {
     marginBottom: 14,
     backgroundColor: "#E5E7EB",
-    borderRadius: 14,
+    borderRadius: 0,
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderWidth: 1,
@@ -633,7 +665,7 @@ const styles = StyleSheet.create({
   weekSquare: {
     height: 54,
     width: 46,
-    borderRadius: 10,
+    borderRadius: 0,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     backgroundColor: "#E5E7EB",
@@ -685,7 +717,7 @@ const styles = StyleSheet.create({
   },
   mealCard: {
     flexDirection: "row",
-    borderRadius: 16,
+    borderRadius: 0,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E5E7EB",
@@ -718,7 +750,7 @@ const styles = StyleSheet.create({
   mealMenuIconBtn: {
     width: 34,
     height: 34,
-    borderRadius: 17,
+    borderRadius: 0,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#F9FAFB",
@@ -758,7 +790,7 @@ const styles = StyleSheet.create({
   mealIconWrap: {
     width: 24,
     height: 24,
-    borderRadius: 12,
+    borderRadius: 0,
     backgroundColor: "#FFF7ED",
     borderWidth: 1,
     borderColor: "#FED7AA",
@@ -855,6 +887,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 3,
+  },
+  topHeaderIconsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   topHeaderNotifDot: {
     position: "absolute",

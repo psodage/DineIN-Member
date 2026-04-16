@@ -16,7 +16,7 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "../../lib/api";
 
-const SnackOrderPage = () => {
+const SnackOrderPage = ({ embedded = false }) => {
   const router = useRouter();
 
   const [studentId, setStudentId] = useState(null);
@@ -407,17 +407,19 @@ const SnackOrderPage = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color="#111827" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Order Extra Snacks</Text>
-        <View style={styles.headerRight} />
-      </View>
+      {!embedded && (
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color="#111827" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Order Extra Snacks</Text>
+          <View style={styles.headerRight} />
+        </View>
+      )}
 
       <View style={styles.subHeader}>
         <Text style={styles.subtitle}>

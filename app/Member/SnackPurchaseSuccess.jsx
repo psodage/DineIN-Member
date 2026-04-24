@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: "#111827",
+    backgroundColor: "#0F8F88",
     gap: 6,
   },
   primaryButtonText: {

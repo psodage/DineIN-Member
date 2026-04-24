@@ -1,70 +1,32 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Image,
+  ActivityIndicator,
+  Alert,
   Animated,
+  FlatList,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../lib/AuthContext";
+import api from "../../lib/api";
 
-// Dummy data shaped like the schemas:
-// - LeaveStat (day-wise entries): date, status, leaveType, month, year
-// - MemberMonthlyDue: month, year, totalBill, paidAmount, dueAmount, status
-const MOCK_LEAVE_STATS = [
-  // April 2026
-  { date: "2026-04-03", status: "Approved", leaveType: "Sick", month: 3, year: 2026 }, // 3
-  { date: "2026-04-04", status: "Approved", leaveType: "Sick", month: 3, year: 2026 }, // 4
-  { date: "2026-04-11", status: "Pending", leaveType: "Casual", month: 3, year: 2026 }, // 11
-  { date: "2026-04-18", status: "Approved", leaveType: "Casual", month: 3, year: 2026 }, // 18
-  { date: "2026-04-27", status: "Pending", leaveType: "Emergency", month: 3, year: 2026 }, // 27
-
-  // March 2026
-  { date: "2026-03-02", status: "Approved", leaveType: "Sick", month: 2, year: 2026 },
-  { date: "2026-03-05", status: "Approved", leaveType: "Casual", month: 2, year: 2026 },
-  { date: "2026-03-19", status: "Pending", leaveType: "Sick", month: 2, year: 2026 },
-
-  // February 2026
-  { date: "2026-02-07", status: "Approved", leaveType: "Casual", month: 1, year: 2026 },
-  { date: "2026-02-08", status: "Approved", leaveType: "Casual", month: 1, year: 2026 },
-  { date: "2026-02-21", status: "Pending", leaveType: "Emergency", month: 1, year: 2026 },
-];
-
-const MOCK_MEMBER_MONTHLY_DUE = [
-  // February
-  {
-    month: 1,
-    year: 2026,
-    totalBill: 8200,
-    paidAmount: 4100,
-    dueAmount: 4100,
-    status: "Partial",
-  },
-  // March
-  {
-    month: 2,
-    year: 2026,
-    totalBill: 9200,
-    paidAmount: 9200,
-    dueAmount: 0,
-    status: "Paid",
-  },
-  // April
-  {
-    month: 3,
-    year: 2026,
-    totalBill: 12500,
-    paidAmount: 3500,
-    dueAmount: 9000,
-    status: "Partial",
-  },
-];
-
+const PRIMARY = "#0F8F88";
+const BG = "#F5F7FA";
+const TEXT_DARK = "#0F172A";
+const TEXT_MUTE = "#64748B";
+const GREEN_BG = "#DDF5E8";
+const GREEN_TEXT = "#188A5A";
+const RED_BG = "#FCE8EA";
+const RED_TEXT = "#BE3845";
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTHS = [
   "January",
@@ -80,316 +42,89 @@ const MONTHS = [
   "November",
   "December",
 ];
-const WEEKDAYS_FULL = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
+const MONTHLY_LEAVE_ALLOWANCE = 20;
 
-function formatYMD(d) {
+function monthKeyLocal(dateLike) {
+  const d = new Date(dateLike);
+  if (Number.isNaN(d.getTime())) return "";
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return `${y}-${m}`;
 }
 
-function formatSelectedDateFull(d) {
-  const weekday = WEEKDAYS_FULL[d.getDay()];
-  const day = d.getDate();
-  const month = MONTHS[d.getMonth()];
-  const year = d.getFullYear();
-  return `${weekday}, ${day} ${month} ${year}`;
+function extractDayFromKey(dayKey) {
+  if (!dayKey) return null;
+  const s = String(dayKey).trim();
+  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  return Number(match[3]);
 }
 
-function getDaysInMonth(year, monthIndex) {
+function formatDateLabel(dateLike) {
+  const d = new Date(dateLike);
+  if (Number.isNaN(d.getTime())) return "-";
+  try {
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch {
+    return "-";
+  }
+}
+
+function daysInMonth(year, monthIndex) {
   return new Date(year, monthIndex + 1, 0).getDate();
 }
 
-function getMonthTitle(year, monthIndex) {
-  return `${MONTHS[monthIndex]} ${year}`;
-}
-
-// Monday-first calendar grid (42 cells).
 function buildMonthCells(year, monthIndex) {
   const first = new Date(year, monthIndex, 1);
-  const daysInMonth = getDaysInMonth(year, monthIndex);
-
-  // JS: Sunday=0..Saturday=6. Convert so Monday=0..Sunday=6.
-  const mondayIndex = (first.getDay() + 6) % 7;
-
+  const total = daysInMonth(year, monthIndex);
+  const mondayStart = (first.getDay() + 6) % 7;
   const cells = [];
+
   for (let i = 0; i < 42; i += 1) {
-    const dayNumber = i - mondayIndex + 1;
-    if (dayNumber < 1 || dayNumber > daysInMonth) {
-      cells.push(null);
-      continue;
-    }
-    cells.push(new Date(year, monthIndex, dayNumber));
+    const day = i - mondayStart + 1;
+    cells.push(day > 0 && day <= total ? day : null);
   }
   return cells;
 }
 
-function shiftMonth(selectedDate, delta) {
-  const day = selectedDate.getDate();
-  const next = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + delta, 1);
-  const days = getDaysInMonth(next.getFullYear(), next.getMonth());
-  const clampedDay = Math.min(day, days);
-  return new Date(next.getFullYear(), next.getMonth(), clampedDay);
+function toMonthKey(year, monthIndex) {
+  return `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
 }
 
-function getMonthlyLeaveSummary(monthIndex, year) {
-  const monthItems = MOCK_LEAVE_STATS.filter(
-    (r) => r.month === monthIndex && r.year === year
-  );
-
-  const total = monthItems.length;
-  const approved = monthItems.filter((r) => r.status === "Approved").length;
-  const pending = monthItems.filter((r) => r.status === "Pending").length;
-
-  if (!total) return null;
-  return { total, approved, pending };
-}
-
-function getMonthlyBillSummary(monthIndex, year) {
-  const item = MOCK_MEMBER_MONTHLY_DUE.find(
-    (b) => b.month === monthIndex && b.year === year
-  );
-  if (!item) return null;
-
-  const total = item.totalBill ?? 0;
-  const paid = item.paidAmount ?? 0;
-  const due = item.dueAmount ?? Math.max(total - paid, 0);
-
-  let status = item.status;
-  if (!status) {
-    if (!due || due <= 0) status = "Paid";
-    else if (paid > 0) status = "Partial";
-    else status = "Unpaid";
-  }
-
-  return { total, paid, due, status };
-}
-
-function getBadgeColors(status) {
-  if (status === "Paid") {
-    return { bg: "#ECFDF5", fg: "#047857", border: "#10B981" };
-  }
-  if (status === "Partial") {
-    return { bg: "#FFF7ED", fg: "#9A3412", border: "#F97316" };
-  }
-  return { bg: "#FEF2F2", fg: "#991B1B", border: "#EF4444" };
+function normalizedBillStatus({ dueAmount, paidAmount, monthlyStatus }) {
+  const due = Number(dueAmount || 0);
+  const paid = Number(paidAmount || 0);
+  if (due <= 0) return "Paid";
+  if (paid > 0) return "Partial";
+  const status = String(monthlyStatus || "").trim();
+  return status || "Pending";
 }
 
 export default function ActivityCalendarScreen({ embedded = false }) {
   const router = useRouter();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuth();
-
-  const memberName = user?.name || "Member";
-  const restaurantLogoSource = require("../../assets/images/logo2.png");
-
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
   const [selectedDate, setSelectedDate] = useState(() => new Date());
-  const selectedYear = selectedDate.getFullYear();
-  const selectedMonthIndex = selectedDate.getMonth();
-
-  // Safety clamp in case selected day-of-month doesn't exist in the month.
-  useEffect(() => {
-    const days = getDaysInMonth(selectedYear, selectedMonthIndex);
-    if (selectedDate.getDate() <= days) return;
-    setSelectedDate(
-      new Date(selectedYear, selectedMonthIndex, Math.max(1, days))
-    );
-  }, [selectedDate, selectedYear, selectedMonthIndex]);
-
-  const cells = useMemo(
-    () => buildMonthCells(selectedYear, selectedMonthIndex),
-    [selectedYear, selectedMonthIndex]
-  );
-
-  const monthTitle = useMemo(
-    () => getMonthTitle(selectedYear, selectedMonthIndex),
-    [selectedYear, selectedMonthIndex]
-  );
-
-  const selectedDateKey = useMemo(() => formatYMD(selectedDate), [selectedDate]);
-  const leaveSummary = useMemo(
-    () => getMonthlyLeaveSummary(selectedMonthIndex, selectedYear),
-    [selectedMonthIndex, selectedYear]
-  );
-  const billSummary = useMemo(
-    () => getMonthlyBillSummary(selectedMonthIndex, selectedYear),
-    [selectedMonthIndex, selectedYear]
-  );
-
-  const dotMap = useMemo(() => {
-    // Calendar dots:
-    // - Approved leave days: green dot
-    // - Pending leave days: amber dot
-    // - Extra sample due dot: blue on ~25th
-    const map = new Map(); // ymd -> [colors]
-
-    const addDot = (ymd, color) => {
-      const prev = map.get(ymd) || [];
-      if (prev.length >= 3) return;
-      map.set(ymd, [...prev, color]);
-    };
-
-    for (const r of MOCK_LEAVE_STATS) {
-      if (r.month !== selectedMonthIndex || r.year !== selectedYear) continue;
-      const color = r.status === "Approved" ? "#10B981" : "#F59E0B";
-      addDot(r.date, color);
-    }
-
-    // Sample due indicator dot on 25th.
-    const dueDay = 25;
-    const dueDate = new Date(selectedYear, selectedMonthIndex, dueDay);
-    if (!Number.isNaN(dueDate.getTime())) addDot(formatYMD(dueDate), "#3B82F6");
-
-    return map;
-  }, [selectedMonthIndex, selectedYear]);
-
-  const renderWeekdayRow = () => {
-    return (
-      <View style={styles.weekdayRow}>
-        {WEEKDAY_LABELS.map((label) => (
-          <Text key={label} style={styles.weekdayLabel}>
-            {label}
-          </Text>
-        ))}
-      </View>
-    );
-  };
-
-  const renderCalendarGrid = () => {
-    const rows = [];
-    for (let i = 0; i < cells.length; i += 7) {
-      rows.push(cells.slice(i, i + 7));
-    }
-
-    return (
-      <View style={{ width: "100%" }}>
-        {rows.map((week, weekIdx) => (
-          <View key={`w-${weekIdx}`} style={styles.weekRow}>
-            {week.map((d, idx) => {
-              if (!d) {
-                return <View key={`e-${weekIdx}-${idx}`} style={styles.dayCellEmpty} />;
-              }
-
-              const ymd = formatYMD(d);
-              const isSelected = ymd === selectedDateKey;
-              const dots = dotMap.get(ymd) || [];
-
-              return (
-                <TouchableOpacity
-                  key={ymd}
-                  activeOpacity={0.9}
-                  onPress={() => setSelectedDate(d)}
-                  style={[styles.dayCell, isSelected && styles.dayCellSelected]}
-                >
-                  <View style={styles.dayInner}>
-                    <Text style={[styles.dayNumber, isSelected && styles.dayNumberSelected]}>
-                      {d.getDate()}
-                    </Text>
-
-                    {!!dots.length && (
-                      <View style={styles.dotsWrap}>
-                        {dots.map((color, dotIdx) => (
-                          <View
-                            key={`${ymd}-${dotIdx}`}
-                            style={[styles.dot, { backgroundColor: color }]}
-                          />
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        ))}
-      </View>
-    );
-  };
-
-  const leaveCard = () => {
-    return (
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Monthly Leave Days</Text>
-          <View style={styles.cardHeaderLine} />
-        </View>
-
-        {!leaveSummary ? (
-          <Text style={styles.noDataText}>No leave records for this month</Text>
-        ) : (
-          <>
-            <View style={styles.statRow}>
-              <Text style={styles.statLabel}>Total Leave Days</Text>
-              <Text style={styles.statValue}>{leaveSummary.total}</Text>
-            </View>
-            <View style={styles.statRow}>
-              <Text style={styles.statLabel}>Approved Leaves</Text>
-              <Text style={styles.statValueApproved}>{leaveSummary.approved}</Text>
-            </View>
-            <View style={styles.statRow}>
-              <Text style={styles.statLabel}>Pending Leaves</Text>
-              <Text style={styles.statValuePending}>{leaveSummary.pending}</Text>
-            </View>
-          </>
-        )}
-      </View>
-    );
-  };
-
-  const billCard = () => {
-    const badge = billSummary ? getBadgeColors(billSummary.status) : null;
-
-    return (
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Monthly Bill</Text>
-          <View style={styles.cardHeaderLine} />
-        </View>
-
-        {!billSummary ? (
-          <Text style={styles.noDataText}>No bill generated for this month</Text>
-        ) : (
-          <>
-            <View style={styles.billTopRow}>
-              <View style={[styles.badge, badge && { backgroundColor: badge.bg, borderColor: badge.border }]}>
-                <Text style={[styles.badgeText, badge && { color: badge.fg }]}>
-                  {billSummary.status}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }} />
-            </View>
-
-            <View style={styles.statRow}>
-              <Text style={styles.statLabel}>Total Monthly Bill</Text>
-              <Text style={styles.statValue}>₹{Math.round(billSummary.total).toLocaleString("en-IN")}</Text>
-            </View>
-            <View style={styles.statRow}>
-              <Text style={styles.statLabel}>Paid Amount</Text>
-              <Text style={styles.statValueApproved}>₹{Math.round(billSummary.paid).toLocaleString("en-IN")}</Text>
-            </View>
-            <View style={styles.statRow}>
-              <Text style={styles.statLabel}>Remaining Due</Text>
-              <Text style={styles.statValuePending}>₹{Math.round(billSummary.due).toLocaleString("en-IN")}</Text>
-            </View>
-          </>
-        )}
-      </View>
-    );
-  };
-
-  const onPrevMonth = () => setSelectedDate((d) => shiftMonth(d, -1));
-  const onNextMonth = () => setSelectedDate((d) => shiftMonth(d, 1));
-
   const [activeTab, setActiveTab] = useState("leaves");
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [memberDetails, setMemberDetails] = useState(null);
+  const [monthLeaveSummary, setMonthLeaveSummary] = useState(null);
+  const [billSummary, setBillSummary] = useState(null);
+  const [leaveDates, setLeaveDates] = useState(new Set());
+  const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
+  const [applyStartDate, setApplyStartDate] = useState("");
+  const [applyEndDate, setApplyEndDate] = useState("");
+  const [applyReason, setApplyReason] = useState("");
+  const [submittingLeave, setSubmittingLeave] = useState(false);
   const tabScaleRef = useRef({
     home: new Animated.Value(1),
     snacks: new Animated.Value(1),
@@ -398,538 +133,878 @@ export default function ActivityCalendarScreen({ embedded = false }) {
     profile: new Animated.Value(1),
   });
 
-  const getTabScaleValue = (key) => {
-    if (!tabScaleRef.current[key]) {
-      tabScaleRef.current[key] = new Animated.Value(1);
-    }
-    return tabScaleRef.current[key];
-  };
+  const year = selectedMonth.getFullYear();
+  const monthIndex = selectedMonth.getMonth();
+  const selectedDay = selectedDate.getFullYear() === year && selectedDate.getMonth() === monthIndex
+    ? selectedDate.getDate()
+    : null;
+  const monthTitle = `${MONTHS[monthIndex]} ${year}`;
+  const calendarData = useMemo(() => buildMonthCells(year, monthIndex), [year, monthIndex]);
+  const memberId = user?.id || user?._id;
+  const monthKey = useMemo(() => toMonthKey(year, monthIndex), [year, monthIndex]);
 
-  const TopHeader = () => {
-    return (
-      <View style={[styles.topHeader, { paddingTop: insets.top + 8 }]}>
-        <View style={styles.topHeaderInner}>
-          <View style={styles.topHeaderLeft}>
-            <View style={styles.restaurantAvatar}>
-              <Image
-                source={restaurantLogoSource}
-                style={styles.restaurantAvatarImage}
-                resizeMode="cover"
-              />
-            </View>
+  const loadMonthData = useCallback(
+    async (isRefresh = false) => {
+      if (!memberId) {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
 
-            <View style={styles.topHeaderDivider} />
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
 
-            <View style={styles.topHeaderTextBlock}>
-              <Text style={styles.topHeaderGreeting}>Welcome Back!</Text>
-              <Text
-                numberOfLines={1}
-                ellipsizeMode="tail"
-                style={styles.topHeaderTitle}
-              >
-                {memberName}
-              </Text>
-            </View>
-          </View>
+      try {
+        const [memberRes, billRes, leaveRes] = await Promise.all([
+          api.get(`/api/members/${memberId}`),
+          api.get(`/api/member-monthly-due/${memberId}?month=${monthKey}`),
+          api.get(`/api/leave/self/${memberId}/month?month=${monthKey}`),
+        ]);
 
-          <View style={styles.topHeaderIconsRow}>
-            <TouchableOpacity
-              style={styles.topHeaderNotifBtn}
-              activeOpacity={0.85}
-              onPress={() => {
-                setActiveTab("home");
-              }}
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={20}
-                color="#1F2937"
-              />
-              <View style={styles.topHeaderNotifDot} />
-            </TouchableOpacity>
+        setMemberDetails(memberRes?.data || null);
+        setBillSummary(billRes?.data || null);
+        setMonthLeaveSummary(leaveRes?.data || null);
 
-            <TouchableOpacity
-              style={styles.topHeaderNotifBtn}
-              activeOpacity={0.85}
-              onPress={async () => {
-                try {
-                  await logout?.();
-                } finally {
-                  router.replace("/");
-                }
-              }}
-            >
-              <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  const BottomNav = () => {
-    const primary = "#F97316";
-    const inactive = "#9CA3AF";
-
-    const animatePress = (key) => {
-      const v = getTabScaleValue(key);
-      if (!v) return;
-      Animated.spring(v, {
-        toValue: 0.94,
-        useNativeDriver: true,
-        speed: 30,
-        bounciness: 6,
-      }).start(() => {
-        Animated.spring(v, {
-          toValue: 1,
-          useNativeDriver: true,
-          speed: 30,
-          bounciness: 6,
-        }).start();
-      });
-    };
-
-    const goTo = (key) => {
-      setActiveTab(key);
-      animatePress(key);
-
-      if (key === "snacks") router.push("/Member/SnackOrderPage");
-      if (key === "leaves") router.push("/Member/ActivityCalendarScreen");
-      if (key === "profile") router.push("/Member/MemberProfile");
-    };
-
-    const item = (key, label, icon) => {
-      const isActive = activeTab === key;
-      const color = isActive ? primary : inactive;
-      const size = isActive ? 26 : 22;
-      return (
-        <TouchableOpacity
-          key={key}
-          style={styles.bottomNavItem}
-          activeOpacity={0.9}
-          onPress={() => goTo(key)}
-        >
-          <View style={styles.bottomNavItemInner}>
-            {isActive && (
-              <View
-                style={[styles.bottomNavIndicator, { backgroundColor: primary }]}
-              />
-            )}
-            <Animated.View
-              style={{ transform: [{ scale: getTabScaleValue(key) }] }}
-            >
-              <Ionicons name={icon} size={size} color={color} />
-            </Animated.View>
-            <Text style={[styles.bottomNavLabel, { color }]}>{label}</Text>
-          </View>
-        </TouchableOpacity>
-      );
-    };
-
-    return (
-      <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-        {item("snacks", "Extra Snacks", "fast-food-outline")}
-        {item("leaves", "Leaves", "calendar-outline")}
-        {item("home", "Home", "home-outline")}
-        {item("bill", "Bill", "receipt-outline")}
-        {item("profile", "Profile", "person-outline")}
-      </View>
-    );
-  };
-
-  const content = (
-    <ScrollView
-      style={embedded ? styles.embeddedBodyScroll : styles.bodyScroll}
-      contentContainerStyle={embedded ? styles.embeddedBodyContent : styles.bodyContent}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.calendarShell}>
-        <View style={styles.monthHeaderRow}>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={onPrevMonth}
-            style={styles.monthNavBtn}
-          >
-            <Ionicons name="chevron-back" size={20} color="#111827" />
-          </TouchableOpacity>
-
-          <Text style={styles.monthTitle}>{monthTitle}</Text>
-
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={onNextMonth}
-            style={styles.monthNavBtn}
-          >
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color="#111827"
-            />
-          </TouchableOpacity>
-        </View>
-
-        {renderWeekdayRow()}
-
-        <View style={{ marginTop: 10 }}>{renderCalendarGrid()}</View>
-      </View>
-
-      <View style={styles.selectedDateBar}>
-        <Text style={styles.selectedDateText}>
-          {formatSelectedDateFull(selectedDate)}
-        </Text>
-      </View>
-
-      <View style={styles.cardsWrap}>
-        {leaveCard()}
-        {billCard()}
-      </View>
-    </ScrollView>
+        const leaveKeys = Array.isArray(leaveRes?.data?.approvedLeaveDates)
+          ? leaveRes.data.approvedLeaveDates
+          : [];
+        setLeaveDates(
+          new Set(
+            leaveKeys
+              .map((key) => extractDayFromKey(key))
+              .filter((day) => Number.isInteger(day) && day > 0)
+          )
+        );
+      } catch (error) {
+        console.error("Leaves month fetch error:", error);
+        if (!isRefresh) {
+          setMemberDetails(null);
+          setBillSummary(null);
+          setMonthLeaveSummary(null);
+          setLeaveDates(new Set());
+        }
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [memberId, monthKey]
   );
 
-  if (embedded) {
-    return content;
-  }
+  useEffect(() => {
+    loadMonthData(false);
+  }, [loadMonthData]);
+
+  const leaveTakenDays = leaveDates;
+  const inactiveDaysCount = Number(monthLeaveSummary?.approvedLeaveCount || 0) || leaveTakenDays.size;
+  const monthlyAllowance = MONTHLY_LEAVE_ALLOWANCE;
+  const leavesAvailableCount = Math.max(0, monthlyAllowance - inactiveDaysCount);
+  const totalBill = Number(billSummary?.totalBill || 0);
+  const paidAmount = Number(billSummary?.paidAmount || 0);
+  const dueAmount = Number(billSummary?.remainingAmount ?? billSummary?.monthlyDue ?? 0);
+  const monthlyStatus = normalizedBillStatus({
+    dueAmount,
+    paidAmount,
+    monthlyStatus: billSummary?.monthlyStatus,
+  });
+  const nextResetDate = new Date(year, monthIndex + 1, 1);
+  const billSummaryText = `Total ₹${totalBill.toLocaleString("en-IN")} • Paid ₹${paidAmount.toLocaleString("en-IN")} • Due ₹${Math.max(0, dueAmount).toLocaleString("en-IN")}`;
+
+  const onChangeMonth = (delta) => {
+    setSelectedMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
+  };
+
+  const onPickDay = (day) => {
+    if (!day) return;
+    setSelectedDate(new Date(year, monthIndex, day));
+  };
+
+  const getScale = (key) => tabScaleRef.current[key] || new Animated.Value(1);
+  const animateTab = (key) => {
+    const v = getScale(key);
+    Animated.sequence([
+      Animated.spring(v, { toValue: 0.94, useNativeDriver: true, speed: 30, bounciness: 6 }),
+      Animated.spring(v, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 6 }),
+    ]).start();
+  };
+
+  const onTabPress = (key) => {
+    setActiveTab(key);
+    animateTab(key);
+    if (embedded) return;
+    if (key === "snacks") router.push("/Member/SnackOrderPage");
+    if (key === "leaves") router.push("/Member/ActivityCalendarScreen");
+    if (key === "home") router.push("/Member/MemberDashboard");
+    if (key === "bill") router.push("/Member/MemberBill");
+    if (key === "profile") router.push("/Member/MemberProfile");
+  };
+
+  const openApplyWithSelectedDate = () => {
+    const seedDate = selectedDate && selectedDate.getMonth() === monthIndex && selectedDate.getFullYear() === year
+      ? selectedDate
+      : new Date(year, monthIndex, 1);
+    const ymd = monthKeyLocal(seedDate);
+    const day = String(seedDate.getDate()).padStart(2, "0");
+    const seedYmd = `${ymd}-${day}`;
+    setApplyStartDate(seedYmd);
+    setApplyEndDate(seedYmd);
+    setApplyReason("");
+    setIsApplyModalOpen(true);
+  };
+
+  const submitLeaveApplication = async () => {
+    if (!memberId) return;
+    if (!applyStartDate || !applyEndDate) {
+      Alert.alert("Missing dates", "Please select start and end date.");
+      return;
+    }
+    if (new Date(applyEndDate) < new Date(applyStartDate)) {
+      Alert.alert("Invalid range", "End date must be on or after start date.");
+      return;
+    }
+
+    try {
+      setSubmittingLeave(true);
+      await api.post("/api/leave/apply", {
+        memberId,
+        startDate: applyStartDate,
+        endDate: applyEndDate,
+        reason: applyReason.trim(),
+        type: "Leave",
+      });
+      setIsApplyModalOpen(false);
+      await loadMonthData(true);
+      Alert.alert("Success", "Leave request submitted successfully.");
+    } catch (error) {
+      console.error("Leave apply error:", error);
+      Alert.alert("Error", error?.response?.data?.message || "Failed to submit leave request.");
+    } finally {
+      setSubmittingLeave(false);
+    }
+  };
+
+  const renderDayTile = ({ item, index }) => {
+    if (!item) return <View style={styles.dayPlaceholder} />;
+    const isSelected = item === selectedDay;
+    const isLeaveTaken = leaveTakenDays.has(item);
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.dayTile,
+          isLeaveTaken ? styles.dayTileLeave : styles.dayTileAvailable,
+          isSelected && styles.dayTileSelected,
+          index % 7 !== 6 && styles.dayTileSpacing,
+        ]}
+        activeOpacity={0.88}
+        onPress={() => onPickDay(item)}
+      >
+        <Text
+          style={[
+            styles.dayTileText,
+            isLeaveTaken ? styles.dayTileTextLeave : styles.dayTileTextAvailable,
+            isSelected && styles.dayTileTextSelected,
+          ]}
+        >
+          {item}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const contentBottomPadding = embedded ? 24 : 118;
 
   return (
-    <View style={styles.container}>
-      <TopHeader />
-      {content}
+    <SafeAreaView
+      style={styles.safeArea}
+      edges={embedded ? ["left", "right", "bottom"] : ["top", "left", "right", "bottom"]}
+    >
+      <ScrollView
+        style={styles.pageScroll}
+        contentContainerStyle={[styles.pageContent, { paddingBottom: contentBottomPadding }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadMonthData(true)} tintColor={PRIMARY} />}
+      >
+        <View style={[styles.heroHeader, { paddingTop: embedded ? 14 : insets.top + 14 }]}>
+          <Ionicons name="fast-food-outline" size={84} color="rgba(255,255,255,0.11)" style={styles.patternOne} />
+          <Ionicons name="pizza-outline" size={58} color="rgba(255,255,255,0.11)" style={styles.patternTwo} />
+          <Ionicons name="ice-cream-outline" size={44} color="rgba(255,255,255,0.10)" style={styles.patternThree} />
 
-      <BottomNav />
-    </View>
+          <View style={styles.heroTopRow}>
+            <TouchableOpacity
+              style={styles.roundedIconBtn}
+              activeOpacity={0.85}
+              onPress={() => {
+                if (embedded) onTabPress("home");
+                else router.back();
+              }}
+            >
+              <Ionicons name="chevron-back" size={18} color={TEXT_DARK} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.historyPill}
+              activeOpacity={0.9}
+              onPress={() => router.push("/Member/LeaveHistoryScreen")}
+            >
+              <Ionicons name="time-outline" size={14} color={PRIMARY} />
+              <Text style={styles.historyPillText}>Leave History</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.heroTitle}>My Leaves</Text>
+          <Text style={styles.heroSubtitle}>Manage your leave days easily</Text>
+        </View>
+
+        <View style={styles.mainCard}>
+          <View style={styles.monthRow}>
+            <TouchableOpacity style={styles.monthNavBtn} activeOpacity={0.88} onPress={() => onChangeMonth(-1)}>
+              <Ionicons name="chevron-back" size={18} color={PRIMARY} />
+            </TouchableOpacity>
+            <Text style={styles.monthTitle}>{monthTitle}</Text>
+            <TouchableOpacity style={styles.monthNavBtn} activeOpacity={0.88} onPress={() => onChangeMonth(1)}>
+              <Ionicons name="chevron-forward" size={18} color={PRIMARY} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.weekStrip}>
+            {WEEKDAY_LABELS.map((day) => (
+              <Text key={day} style={styles.weekStripText}>
+                {day}
+              </Text>
+            ))}
+          </View>
+
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryIconBox}>
+              <Ionicons name="calendar-outline" size={15} color={PRIMARY} />
+              </View>
+              <View style={styles.summaryMainBlock}>
+                <Text style={styles.summaryTitle}>Monthly Leave Days</Text>
+                <Text style={styles.summaryValue}>{inactiveDaysCount} Days</Text>
+                <Text style={styles.summarySub}>Total Available</Text>
+              </View>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryIconBox}>
+                <Ionicons name="receipt-outline" size={15} color={TEXT_MUTE} />
+              </View>
+              <View style={styles.summaryMainBlock}>
+                <Text style={styles.summaryTitle}>Monthly Bill</Text>
+                <Text style={styles.billValue}>{billSummaryText}</Text>
+              </View>
+              <View style={styles.pendingBadge}>
+                <Text style={styles.pendingBadgeText}>{monthlyStatus}</Text>
+              </View>
+            </View>
+          </View>
+
+          {loading && (
+            <View style={styles.loadingInline}>
+              <ActivityIndicator size="small" color={PRIMARY} />
+              <Text style={styles.loadingInlineText}>Loading month data...</Text>
+            </View>
+          )}
+
+          <FlatList
+            data={calendarData}
+            keyExtractor={(_, index) => `cell-${index}`}
+            renderItem={renderDayTile}
+            numColumns={7}
+            scrollEnabled={false}
+            contentContainerStyle={styles.calendarList}
+          />
+
+          <View style={styles.legendRow}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: "#10B981" }]} />
+              <Text style={styles.legendText}>Available</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: "#F59AA4" }]} />
+              <Text style={styles.legendText}>Leave Taken</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={styles.legendDotSelected} />
+              <Text style={styles.legendText}>Selected</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.applyCard} activeOpacity={0.9} onPress={openApplyWithSelectedDate}>
+            <View style={styles.applyIconBox}>
+              <Ionicons name="calendar-outline" size={18} color={PRIMARY} />
+            </View>
+            <View style={styles.applyTextWrap}>
+              <Text style={styles.applyTitle}>Apply for Leave</Text>
+              <Text style={styles.applySub}>Select dates and submit your leave request</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={TEXT_MUTE} />
+          </TouchableOpacity>
+
+          <View style={styles.statsCard}>
+            <View style={styles.statsBlock}>
+              <Text style={styles.statsLabel}>Leaves Taken</Text>
+              <Text style={styles.statsValue}>{inactiveDaysCount} Days</Text>
+            </View>
+            <View style={styles.statsDivider} />
+            <View style={styles.statsBlock}>
+              <Text style={styles.statsLabel}>Leaves Available</Text>
+              <Text style={styles.statsValue}>{leavesAvailableCount} Days</Text>
+            </View>
+            <View style={styles.statsDivider} />
+            <View style={styles.statsBlock}>
+              <Text style={styles.statsLabel}>Next Reset Date</Text>
+              <Text style={styles.statsValue}>{formatDateLabel(nextResetDate)}</Text>
+            </View>
+          </View>
+
+          {!loading && !memberDetails && (
+            <Text style={styles.emptyHintText}>No member data found for this account.</Text>
+          )}
+        </View>
+      </ScrollView>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={isApplyModalOpen}
+        onRequestClose={() => setIsApplyModalOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Apply for Leave</Text>
+            <Text style={styles.modalLabel}>Start Date (YYYY-MM-DD)</Text>
+            <TextInput
+              value={applyStartDate}
+              onChangeText={setApplyStartDate}
+              style={styles.modalInput}
+              placeholder="2026-04-23"
+              placeholderTextColor="#94A3B8"
+              autoCapitalize="none"
+            />
+            <Text style={styles.modalLabel}>End Date (YYYY-MM-DD)</Text>
+            <TextInput
+              value={applyEndDate}
+              onChangeText={setApplyEndDate}
+              style={styles.modalInput}
+              placeholder="2026-04-23"
+              placeholderTextColor="#94A3B8"
+              autoCapitalize="none"
+            />
+            <Text style={styles.modalLabel}>Reason</Text>
+            <TextInput
+              value={applyReason}
+              onChangeText={setApplyReason}
+              style={[styles.modalInput, styles.modalReasonInput]}
+              placeholder="Enter reason for leave"
+              placeholderTextColor="#94A3B8"
+              multiline
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalCancelBtn]}
+                activeOpacity={0.88}
+                onPress={() => setIsApplyModalOpen(false)}
+                disabled={submittingLeave}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalSubmitBtn]}
+                activeOpacity={0.88}
+                onPress={submitLeaveApplication}
+                disabled={submittingLeave}
+              >
+                <Text style={styles.modalSubmitText}>{submittingLeave ? "Submitting..." : "Submit"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {!embedded && (
+        <View style={[styles.bottomBarWrap, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+          <View style={styles.bottomBar}>
+            {[
+              { key: "snacks", label: "Extra Snacks", icon: "fast-food-outline" },
+              { key: "leaves", label: "Leaves", icon: "calendar-outline" },
+              { key: "home", label: "Home", icon: "home-outline" },
+              { key: "bill", label: "Bill", icon: "receipt-outline" },
+              { key: "profile", label: "Profile", icon: "person-outline" },
+            ].map((tab) => {
+              const isActive = tab.key === activeTab;
+              return (
+                <TouchableOpacity key={tab.key} style={styles.bottomTab} activeOpacity={0.85} onPress={() => onTabPress(tab.key)}>
+                  <Animated.View style={{ transform: [{ scale: getScale(tab.key) }] }}>
+                    <Ionicons name={tab.icon} size={isActive ? 22 : 19} color={isActive ? PRIMARY : "#94A3B8"} />
+                  </Animated.View>
+                  <Text style={[styles.bottomTabLabel, isActive && styles.bottomTabLabelActive]}>{tab.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: BG,
   },
-  bodyScroll: {
-    flex: 1,
-  },
-  bodyContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 110,
-  },
-  embeddedBodyScroll: {
+  pageScroll: {
     flex: 1,
   },
-  embeddedBodyContent: {
+  pageContent: {
     paddingHorizontal: 0,
-    paddingTop: 0,
-    paddingBottom: 24,
   },
-  page: {
-    flex: 1,
-    backgroundColor: "#F3F4F6",
-  },
-  pageInner: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 24,
-  },
-  calendarShell: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
-  },
-  monthHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  monthTitle: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 18,
-    fontWeight: "900",
-    color: "#111827",
-  },
-  monthNavBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F9FAFB",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  weekdayRow: {
-    flexDirection: "row",
-    marginTop: 10,
-  },
-  weekdayLabel: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 12,
-    fontWeight: "900",
-    color: "#6B7280",
-  },
-  weekRow: {
-    flexDirection: "row",
-    marginTop: 8,
-  },
-  dayCellEmpty: {
-    flex: 1,
-    height: 44,
-  },
-  dayCell: {
-    flex: 1,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 12,
-  },
-  dayCellSelected: {
-    backgroundColor: "rgba(17, 24, 39, 0.06)",
-    borderWidth: 1,
-    borderColor: "#111827",
-  },
-  dayInner: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dayNumber: {
-    fontSize: 13,
-    fontWeight: "900",
-    color: "#111827",
-    marginBottom: 3,
-  },
-  dayNumberSelected: {
-    color: "#111827",
-  },
-  dotsWrap: {
-    flexDirection: "row",
-    gap: 4,
-    alignItems: "center",
-  },
-  dot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-  },
-  selectedDateBar: {
-    marginTop: 14,
-    backgroundColor: "#0B1220",
-    borderRadius: 16,
-    paddingVertical: 12,
+  heroHeader: {
+    backgroundColor: PRIMARY,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     paddingHorizontal: 14,
+    paddingBottom: 74,
+    overflow: "hidden",
   },
-  selectedDateText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "900",
-    textAlign: "center",
+  patternOne: {
+    position: "absolute",
+    right: -6,
+    top: 18,
+    transform: [{ rotate: "-8deg" }],
   },
-  cardsWrap: {
-    marginTop: 14,
-    gap: 12,
+  patternTwo: {
+    position: "absolute",
+    left: 132,
+    top: 18,
+    transform: [{ rotate: "12deg" }],
   },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
+  patternThree: {
+    position: "absolute",
+    right: 58,
+    top: 54,
+    transform: [{ rotate: "8deg" }],
   },
-  cardHeader: {
-    marginBottom: 10,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "900",
-    color: "#111827",
-  },
-  cardHeaderLine: {
-    marginTop: 8,
-    height: 1,
-    width: "100%",
-    backgroundColor: "#F3F4F6",
-  },
-  noDataText: {
-    marginTop: 8,
-    color: "#6B7280",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  statRow: {
+  heroTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 12,
   },
-  statLabel: {
-    color: "#374151",
-    fontSize: 13,
-    fontWeight: "800",
+  roundedIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: "#E7F6F4",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  statValue: {
-    color: "#111827",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  statValueApproved: {
-    color: "#047857",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  statValuePending: {
-    color: "#9A3412",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  billTopRow: {
+  historyPill: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 6,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 7,
+    paddingHorizontal: 11,
+  },
+  historyPillText: {
+    color: "#25515D",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  heroTitle: {
+    marginTop: 14,
+    color: "#FFFFFF",
+    fontSize: 30,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+  heroSubtitle: {
+    marginTop: 4,
+    color: "rgba(255,255,255,0.92)",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  mainCard: {
+    marginTop: 0,
+    marginHorizontal: 10,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    padding: 9,
+    shadowColor: "#0B1220",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  monthRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 8,
   },
-  badge: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: "900",
-  },
-
-  topHeader: {
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  topHeaderInner: {
-    height: 62,
-    flexDirection: "row",
+  monthNavBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: "#E9F7F6",
     alignItems: "center",
-    justifyContent: "space-between",
-  },
-  topHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    paddingRight: 10,
-  },
-  restaurantAvatar: {
-    width: 52,
-    height: 32,
-  },
-  restaurantAvatarImage: {
-    width: "100%",
-    height: "100%",
-  },
-  topHeaderDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: "#E5E7EB",
-    marginHorizontal: 12,
-  },
-  topHeaderTextBlock: {
     justifyContent: "center",
   },
-  topHeaderGreeting: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#9CA3AF",
-    marginBottom: 2,
-  },
-  topHeaderTitle: {
+  monthTitle: {
     fontSize: 17,
     fontWeight: "800",
-    color: "#1F2937",
+    color: "#16233B",
   },
-  topHeaderNotifBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  weekStrip: {
+    flexDirection: "row",
+    backgroundColor: "#F3F5F8",
+    borderRadius: 10,
+    paddingVertical: 7,
+    marginBottom: 8,
+  },
+  weekStripText: {
+    flex: 1,
+    textAlign: "center",
+    color: "#667085",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  summaryCard: {
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: "#EAEFF5",
     backgroundColor: "#FFFFFF",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 7,
+  },
+  summaryIconBox: {
+    width: 29,
+    height: 29,
+    borderRadius: 9,
+    backgroundColor: "#E8F8F6",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    marginRight: 8,
   },
-  topHeaderIconsRow: {
+  summaryMainBlock: {
+    flex: 1,
+  },
+  summaryTitle: {
+    color: "#172554",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  summaryValue: {
+    marginTop: 2,
+    color: PRIMARY,
+    fontSize: 21,
+    fontWeight: "800",
+  },
+  summarySub: {
+    marginTop: 1,
+    color: TEXT_MUTE,
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: "#EDF2F7",
+  },
+  billValue: {
+    marginTop: 3,
+    color: "#4B5563",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  pendingBadge: {
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: "#E08C94",
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+  },
+  pendingBadgeText: {
+    color: "#9F2430",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  calendarList: {
+    marginTop: 8,
+  },
+  dayPlaceholder: {
+    width: "13%",
+    aspectRatio: 1,
+    marginBottom: 6,
+  },
+  dayTile: {
+    width: "13%",
+    aspectRatio: 1,
+    borderRadius: 7,
+    borderWidth: 1.1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 5,
+  },
+  dayTileSpacing: {
+    marginRight: "1.5%",
+  },
+  dayTileAvailable: {
+    backgroundColor: GREEN_BG,
+    borderColor: "#B7EBD1",
+  },
+  dayTileLeave: {
+    backgroundColor: RED_BG,
+    borderColor: "#F8CDD2",
+  },
+  dayTileSelected: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#1F2937",
+    borderWidth: 2,
+  },
+  dayTileText: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  dayTileTextAvailable: {
+    color: GREEN_TEXT,
+  },
+  dayTileTextLeave: {
+    color: RED_TEXT,
+  },
+  dayTileTextSelected: {
+    color: "#111827",
+  },
+  legendRow: {
+    marginTop: 8,
     flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
     gap: 10,
   },
-  topHeaderNotifDot: {
-    position: "absolute",
-    width: 9,
-    height: 9,
-    borderRadius: 999,
-    backgroundColor: "#EF4444",
-    top: -2,
-    right: -2,
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-  },
-
-  bottomNav: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    height: 72,
+  legendItem: {
     flexDirection: "row",
-    justifyContent: "space-around",
     alignItems: "center",
-    paddingTop: 10,
-    paddingHorizontal: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 8,
+    gap: 5,
   },
-  bottomNavItem: {
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendDotSelected: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1.4,
+    borderColor: "#111827",
+  },
+  legendText: {
+    color: "#475569",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  applyCard: {
+    marginTop: 8,
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#EBF0F5",
+    padding: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    shadowColor: "#0B1220",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  applyIconBox: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: "#E8F8F6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  applyTextWrap: {
+    flex: 1,
+  },
+  applyTitle: {
+    color: "#0F172A",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  applySub: {
+    marginTop: 2,
+    color: TEXT_MUTE,
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  statsCard: {
+    marginTop: 8,
+    borderRadius: 12,
+    backgroundColor: PRIMARY,
+    paddingVertical: 9,
+    paddingHorizontal: 6,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  statsBlock: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  bottomNavItemInner: {
+  statsLabel: {
+    color: "rgba(255,255,255,0.86)",
+    fontSize: 10,
+    fontWeight: "500",
+  },
+  statsValue: {
+    marginTop: 3,
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  statsDivider: {
+    width: 1,
+    height: "78%",
+    backgroundColor: "rgba(255,255,255,0.35)",
+  },
+  loadingInline: {
+    marginTop: 8,
+    borderRadius: 10,
+    backgroundColor: "#F0FDFA",
+    borderWidth: 1,
+    borderColor: "#CCFBF1",
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  loadingInlineText: {
+    color: "#0F766E",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  emptyHintText: {
+    marginTop: 10,
+    textAlign: "center",
+    color: TEXT_MUTE,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.45)",
     alignItems: "center",
     justifyContent: "center",
+    padding: 16,
   },
-  bottomNavIndicator: {
-    width: 22,
-    height: 4,
-    borderRadius: 999,
-    marginBottom: 6,
+  modalCard: {
+    width: "100%",
+    maxWidth: 430,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    padding: 14,
   },
-  bottomNavLabel: {
-    marginTop: 4,
-    fontSize: 11,
+  modalTitle: {
+    color: TEXT_DARK,
+    fontSize: 16,
+    fontWeight: "800",
+    marginBottom: 10,
+  },
+  modalLabel: {
+    color: "#334155",
+    fontSize: 12,
     fontWeight: "700",
+    marginBottom: 5,
+    marginTop: 7,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    color: TEXT_DARK,
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  modalReasonInput: {
+    minHeight: 76,
+    textAlignVertical: "top",
+  },
+  modalActions: {
+    marginTop: 12,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
+  modalBtn: {
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+  },
+  modalCancelBtn: {
+    backgroundColor: "#F1F5F9",
+  },
+  modalSubmitBtn: {
+    backgroundColor: PRIMARY,
+  },
+  modalCancelText: {
+    color: "#334155",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  modalSubmitText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  bottomBarWrap: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 0,
+  },
+  bottomBar: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    paddingHorizontal: 6,
+    paddingTop: 8,
+    paddingBottom: 6,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    shadowColor: "#0B1220",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  bottomTab: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  bottomTabLabel: {
+    fontSize: 9,
+    color: "#94A3B8",
+    fontWeight: "700",
+  },
+  bottomTabLabelActive: {
+    color: PRIMARY,
   },
 });
 

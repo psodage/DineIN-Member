@@ -4,6 +4,33 @@ const { resolveEnglishMarathiPair } = require("../utils/translateEnToMr");
 
 const router = express.Router();
 
+function parseDateOnlyToUtcRange(dateStr) {
+  // Accepts "YYYY-MM-DD" (preferred) or any Date-parsable string.
+  const raw = String(dateStr ?? "").trim();
+  if (!raw) return null;
+
+  // If "YYYY-MM-DD", treat it as a date-only value.
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) {
+    const y = Number(m[1]);
+    const mo = Number(m[2]) - 1;
+    const d = Number(m[3]);
+    if (Number.isNaN(y) || Number.isNaN(mo) || Number.isNaN(d)) return null;
+    const startOfDay = new Date(Date.UTC(y, mo, d));
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
+    return { startOfDay, endOfDay };
+  }
+
+  // Fallback: parse as Date and then build UTC day range.
+  const dt = new Date(raw);
+  if (Number.isNaN(dt.getTime())) return null;
+  const startOfDay = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
+  const endOfDay = new Date(startOfDay);
+  endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
+  return { startOfDay, endOfDay };
+}
+
 // GET /api/menu - Fetch all menus
 router.get("/", async (req, res) => {
   try {
@@ -12,6 +39,24 @@ router.get("/", async (req, res) => {
   } catch (error) {
     console.error("Get menus error:", error);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+// GET /api/menu/by-date?date=YYYY-MM-DD - Fetch menu for a date (404 if missing)
+router.get("/by-date", async (req, res) => {
+  try {
+    const { date } = req.query;
+    const range = parseDateOnlyToUtcRange(date);
+    if (!range) {
+      return res.status(400).json({ message: "Valid 'date' query param is required" });
+    }
+
+    const menu = await Menu.findOne({ date: { $gte: range.startOfDay, $lt: range.endOfDay } });
+    if (!menu) return res.status(404).json({ message: "Menu not found for this date" });
+    return res.json(menu);
+  } catch (error) {
+    console.error("Get menu by date error:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 });
 

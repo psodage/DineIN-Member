@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Alert } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  Alert,
+  Image,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -39,6 +48,22 @@ const SnackOrderHistory = () => {
     } catch (_) {
       return "";
     }
+  };
+
+  const getGroupLabel = (value) => {
+    const d = value ? new Date(value) : null;
+    if (!d || Number.isNaN(d.getTime())) return "Earlier";
+
+    const now = new Date();
+    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startTomorrow = new Date(startToday);
+    startTomorrow.setDate(startTomorrow.getDate() + 1);
+    const startWeek = new Date(startToday);
+    startWeek.setDate(startWeek.getDate() - 7);
+
+    if (d >= startToday && d < startTomorrow) return "Today";
+    if (d >= startWeek) return "This Week";
+    return "Earlier";
   };
 
   const displayOrders = useMemo(() => {
@@ -90,6 +115,20 @@ const SnackOrderHistory = () => {
     });
     return merged;
   }, [orderHistory]);
+
+  const groupedDisplayRows = useMemo(() => {
+    const rows = [];
+    let currentLabel = "";
+    displayOrders.forEach((item) => {
+      const label = getGroupLabel(item?.date || item?.createdAt);
+      if (label !== currentLabel) {
+        currentLabel = label;
+        rows.push({ _id: `section-${label}`, rowType: "section", label });
+      }
+      rows.push({ ...item, rowType: "order" });
+    });
+    return rows;
+  }, [displayOrders]);
 
   useEffect(() => {
     const loadStudentId = async () => {
@@ -190,6 +229,14 @@ const SnackOrderHistory = () => {
   };
 
   const renderRow = ({ item }) => {
+    if (item?.rowType === "section") {
+      return (
+        <View style={styles.groupHeaderRow}>
+          <Text style={styles.groupHeaderText}>{item.label}</Text>
+        </View>
+      );
+    }
+
     const qty = Number(item?.quantity || 0);
     const total = item?.isGroupedSplit
       ? Number(item?.totalPrice || 0)
@@ -204,35 +251,55 @@ const SnackOrderHistory = () => {
           return `${names[0]} +${names.length - 1} more`;
         })()
       : item?.snackId?.name || "Snack";
+    const categoryText = item?.isGroupedSplit
+      ? "Combined split snack orders"
+      : item?.snackId?.category || "Snack item";
+    const imageUri = item?.snackId?.imageUrl || item?.snackId?.image || item?.snackId?.thumbnail;
+    const statusLabel = isSplitBill ? "Added to Bill" : "Delivered";
 
     return (
       <TouchableOpacity
-        style={styles.orderRow}
+        style={styles.orderCard}
         activeOpacity={0.75}
         onPress={() => openOrderReceipt(item)}
       >
-        <View style={styles.orderRowLeft}>
-          <Text style={styles.orderSnackName}>
-            {orderTitle}
-          </Text>
-          <Text style={styles.orderMeta}>
-            {formattedDate ? `${formattedDate} • ` : ""}
-            Qty: {qty}
-            {isSplitBill ? " • Split bill" : ""}
-          </Text>
+        <View style={styles.orderCardTop}>
+          <View style={styles.orderThumbWrap}>
+            {imageUri ? (
+              <Image source={{ uri: imageUri }} style={styles.orderThumb} />
+            ) : (
+              <Ionicons name="fast-food-outline" size={22} color="#0F8F88" />
+            )}
+          </View>
+
+          <View style={styles.orderMainInfo}>
+            <Text style={styles.orderSnackName} numberOfLines={1}>
+              {orderTitle}
+            </Text>
+            <Text style={styles.orderMeta} numberOfLines={1}>
+              {formattedDate || "Recent order"} • Qty: {qty}
+            </Text>
+            <Text style={styles.orderCategory} numberOfLines={1}>
+              {categoryText}
+            </Text>
+          </View>
+
+          <View style={styles.orderRightCol}>
+            <Text style={styles.orderTotal}>₹{total.toLocaleString("en-IN")}</Text>
+            <View style={[styles.statusPill, isSplitBill && styles.statusPillBill]}>
+              <Text style={[styles.statusPillText, isSplitBill && styles.statusPillTextBill]}>
+                {statusLabel}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+          </View>
         </View>
 
-        <View style={styles.orderRowRight}>
-          <Ionicons name="cash-outline" size={14} color="#065F46" />
-          <Text style={styles.orderTotal}>
-            ₹{total.toLocaleString("en-IN")}
+        <View style={styles.orderCardBottom}>
+          <Text style={styles.orderBottomText}>
+            Ordered on: {formattedDate || "-"}
           </Text>
-          <Ionicons
-            name="chevron-forward"
-            size={18}
-            color="#9CA3AF"
-            style={styles.rowChevron}
-          />
+          <Text style={styles.orderBottomText}>Qty: {qty}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -248,52 +315,92 @@ const SnackOrderHistory = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color="#111827" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Snack Order History</Text>
-        <View style={styles.headerRight} />
-      </View>
-
-      <View style={styles.subHeader}>
-        <Text style={styles.subtitle}>
-           Recent orders:
-        </Text>
-      </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#111827" />
-        </View>
-      ) : error ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="alert-circle-outline" size={54} color="#F59E0B" />
-          <Text style={styles.emptyText}>Failed to load history.</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={handleRetry} activeOpacity={0.85}>
-            <Text style={styles.retryText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      ) : displayOrders.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="fast-food-outline" size={64} color="#D1D5DB" />
-          <Text style={styles.emptyText}>
-            Place your first snack order to see history here.
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={displayOrders}
-          keyExtractor={(item) => String(item?._id)}
-          renderItem={renderRow}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
+      <View style={styles.headerBackground}>
+        <Ionicons
+          name="fast-food-outline"
+          size={64}
+          color="rgba(255,255,255,0.11)"
+          style={styles.patternTopLeft}
         />
-      )}
+        <Ionicons
+          name="restaurant-outline"
+          size={58}
+          color="rgba(255,255,255,0.10)"
+          style={styles.patternTopRight}
+        />
+        <Ionicons
+          name="pizza-outline"
+          size={52}
+          color="rgba(255,255,255,0.09)"
+          style={styles.patternBottomRight}
+        />
+      </View>
+
+      <View style={styles.headerContent}>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="arrow-back" size={20} color="#0F8F88" />
+          </TouchableOpacity>
+         
+        </View>
+
+        <Text style={styles.title}>Order History</Text>
+        <Text style={styles.subtitle}>View your recent snack orders</Text>
+      </View>
+
+      <View style={styles.mainPanel}>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0F8F88" />
+          </View>
+        ) : error ? (
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="alert-circle-outline" size={40} color="#F59E0B" />
+            </View>
+            <Text style={styles.emptyTitle}>Failed to load history</Text>
+            <Text style={styles.emptySubtitle}>Please try again in a moment.</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={handleRetry} activeOpacity={0.85}>
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : displayOrders.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="fast-food-outline" size={38} color="#0F8F88" />
+            </View>
+            <Text style={styles.emptyTitle}>No snack orders yet</Text>
+            <Text style={styles.emptySubtitle}>
+              Your placed snack orders will appear here
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={groupedDisplayRows}
+            keyExtractor={(item) => String(item?._id)}
+            renderItem={renderRow}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <View style={styles.sectionHeaderCard}>
+                <View>
+                  <Text style={styles.sectionTitle}>Recent Orders</Text>
+                  <Text style={styles.sectionSubtitle}>Track your snack purchases</Text>
+                </View>
+                <View style={styles.orderCountBadge}>
+                  <Text style={styles.orderCountText}>
+                    {displayOrders.length} Order{displayOrders.length === 1 ? "" : "s"}
+                  </Text>
+                </View>
+              </View>
+            }
+          />
+        )}
+      </View>
     </SafeAreaView>
   );
 };
@@ -303,42 +410,100 @@ export default SnackOrderHistory;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#F5F7FA",
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  headerBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 262,
+    backgroundColor: "#0F8F88",
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  patternTopLeft: {
+    position: "absolute",
+    top: 16,
+    left: 22,
+    transform: [{ rotate: "-8deg" }],
+  },
+  patternTopRight: {
+    position: "absolute",
+    top: 36,
+    right: 50,
+    transform: [{ rotate: "9deg" }],
+  },
+  patternBottomRight: {
+    position: "absolute",
+    top: 120,
+    right: 24,
+    transform: [{ rotate: "-12deg" }],
+  },
+  headerContent: {
+    marginTop:20,
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
+    paddingTop: 8,
+    paddingBottom: 20,
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   backButton: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    alignSelf: "flex-start",
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#0B6A65",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  headerPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  headerPillText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0F8F88",
   },
   title: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  headerRight: {
-    width: 40,
-  },
-  subHeader: {
-    marginLeft: 10,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
+    marginTop: 14,
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: "800",
+    color: "#FFFFFF",
   },
   subtitle: {
-    fontSize: 14,
-    color: "#6B7280",
-    fontWeight: "600",
+    marginTop: 4,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: "500",
+    color: "rgba(255,255,255,0.96)",
+  },
+  mainPanel: {
+    flex: 1,
+    marginTop: 10,
+    marginBottom:-15,
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: -1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 6,
   },
   loadingContainer: {
     flex: 1,
@@ -346,65 +511,177 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   listContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 24,
+    paddingBottom: 32,
   },
-  orderRow: {
+  sectionHeaderCard: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  sectionSubtitle: {
+    marginTop: 2,
+    fontSize: 13,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+  orderCountBadge: {
+    backgroundColor: "#E6F7F5",
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+  },
+  orderCountText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#0F8F88",
+  },
+  groupHeaderRow: {
+    marginTop: 2,
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  groupHeaderText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#0F8F88",
+  },
+  orderCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    padding: 12,
+    marginBottom: 11,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "#EEF2F7",
+    shadowColor: "#0B1220",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 2,
   },
-  orderRowLeft: {
+  orderCardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  orderThumbWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 12,
+    backgroundColor: "#E8F8F6",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  orderThumb: {
+    width: "100%",
+    height: "100%",
+  },
+  orderMainInfo: {
     flex: 1,
-    paddingRight: 12,
+    minWidth: 0,
   },
   orderSnackName: {
     fontSize: 15,
-    fontWeight: "900",
-    color: "#111827",
-    marginBottom: 2,
+    fontWeight: "800",
+    color: "#0F172A",
   },
   orderMeta: {
+    marginTop: 2,
     fontSize: 12,
-    color: "#6B7280",
+    color: "#64748B",
     fontWeight: "600",
   },
-  orderRowRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+  orderCategory: {
+    marginTop: 2,
+    fontSize: 12,
+    color: "#94A3B8",
   },
-  rowChevron: {
-    marginLeft: 2,
+  orderRightCol: {
+    alignItems: "flex-end",
+    gap: 5,
   },
   orderTotal: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "900",
-    color: "#065F46",
+    color: "#0F8F88",
+  },
+  statusPill: {
+    backgroundColor: "#DCFCE7",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  statusPillBill: {
+    backgroundColor: "#E0F2FE",
+  },
+  statusPillText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#166534",
+  },
+  statusPillTextBill: {
+    color: "#075985",
+  },
+  orderCardBottom: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  orderBottomText: {
+    fontSize: 11,
+    color: "#64748B",
+    fontWeight: "600",
   },
   emptyContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 24,
-    paddingVertical: 60,
+    paddingVertical: 56,
   },
-  emptyText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: "#6B7280",
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#E8F8F6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyTitle: {
+    marginTop: 14,
+    fontSize: 18,
+    color: "#0F172A",
+    fontWeight: "800",
     textAlign: "center",
   },
+  emptySubtitle: {
+    marginTop: 6,
+    fontSize: 13,
+    color: "#64748B",
+    textAlign: "center",
+    lineHeight: 19,
+  },
   retryButton: {
-    marginTop: 16,
-    backgroundColor: "#111827",
+    marginTop: 14,
+    backgroundColor: "#0F8F88",
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 999,
@@ -415,4 +692,3 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
-

@@ -4,23 +4,26 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
+  Alert,
   ScrollView,
+  FlatList,
   TouchableOpacity,
-  Pressable,
   Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Defs, LinearGradient, Stop } from "react-native-svg";
 import { useAuth } from "../../lib/AuthContext";
 import { useLanguage } from "../../LanguageContext";
 import api from "../../lib/api";
 import { displayMealPlanMr, displayStatusMr } from "../../lib/memberLabelsMr";
+import MemberBill from "./MemberBill";
 
 const MemberProfile = ({ embedded = false, mode = "profile" }) => {
   const router = useRouter();
-  const { user, loading, isAuthenticated } = useAuth();
+  const params = useLocalSearchParams();
+  const { user, loading, isAuthenticated, logout } = useAuth();
   const { language } = useLanguage();
   const [member, setMember] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -76,31 +79,16 @@ const MemberProfile = ({ embedded = false, mode = "profile" }) => {
   }
 
   if (profileLoading) {
-    const loadingContent = (
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <ProfileSkeleton />
-      </ScrollView>
-    );
-
     return (
       <SafeAreaView style={styles.container}>
-        {!embedded && (
-          <View style={styles.header}>
-            <View style={styles.backButtonPlaceholder} />
-            <Text style={styles.headerTitle}>Profile</Text>
-            <View style={styles.headerRightSpacer} />
-          </View>
-        )}
-        {loadingContent}
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#111827" />
+        </View>
       </SafeAreaView>
     );
   }
 
   const memberName = member?.name || user?.name || "Rahul Patil";
-  const rollNumber = member?.rollNumber || "N/A";
   const roomOwnerName = member?.roomOwnerName || user?.roomOwnerName || "N/A";
   const phone = member?.phone || "N/A";
   const email = member?.email || user?.email || "N/A";
@@ -174,245 +162,280 @@ const MemberProfile = ({ embedded = false, mode = "profile" }) => {
   })();
 
   const percentPaid = Math.round(paymentProgressRatio * 100);
-  const billingOnly = mode === "bill";
+  const effectiveMode =
+    embedded ? mode : String(params?.mode || mode || "profile").toLowerCase();
+  const billingOnly = effectiveMode === "bill";
+
+  const settingsItems = [
+    { key: "edit", title: "Edit Profile", icon: "person-outline" },
+    { key: "password", title: "Change Password", icon: "lock-closed-outline" },
+    { key: "privacy", title: "Privacy Policy", icon: "shield-checkmark-outline" },
+    { key: "support", title: "Help & Support", icon: "help-circle-outline" },
+  ];
+
+  const navItems = [
+    { key: "snacks", label: "Extra Snacks", icon: "fast-food-outline" },
+    { key: "leaves", label: "Leaves", icon: "calendar-outline" },
+    { key: "home", label: "Home", icon: "home-outline" },
+    { key: "bill", label: "Bill", icon: "receipt-outline" },
+    { key: "profile", label: "Profile", icon: "person-outline" },
+  ];
+
+  const handleLogout = () => {
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: async () => {
+          await logout();
+          router.replace("/");
+        },
+      },
+    ]);
+  };
+
+  const handleTabPress = (tabKey) => {
+    if (tabKey === "profile") {
+      router.push("/Member/MemberProfile");
+      return;
+    }
+    if (tabKey === "bill") {
+      router.push("/Member/MemberBill");
+      return;
+    }
+    if (tabKey === "home") {
+      router.push("/Member/MemberDashboard");
+      return;
+    }
+    if (tabKey === "snacks") {
+      router.push("/Member/SnackOrderPage");
+      return;
+    }
+    if (tabKey === "leaves") {
+      router.push("/Member/ActivityCalendarScreen");
+    }
+  };
 
   const content = (
     <ScrollView
-      contentContainerStyle={styles.scrollContent}
+      style={styles.profileScreen}
+      contentContainerStyle={[
+        styles.profileScrollContent,
+        !embedded && styles.profileScrollContentStandalone,
+      ]}
       showsVerticalScrollIndicator={false}
     >
+      {!billingOnly && (
+        <View style={styles.heroCard}>
+          <View style={styles.heroPatternOne}>
+            <Ionicons name="ice-cream-outline" size={34} color={COLORS.headerPattern} />
+          </View>
+          <View style={styles.heroPatternTwo}>
+            <Ionicons name="nutrition-outline" size={34} color={COLORS.headerPattern} />
+          </View>
+          <View style={styles.heroPatternThree}>
+            <Ionicons name="fast-food-outline" size={34} color={COLORS.headerPattern} />
+          </View>
+          <View style={styles.heroPatternFour}>
+            <Ionicons name="cafe-outline" size={30} color={COLORS.headerPattern} />
+          </View>
+
+          <View style={styles.heroTopActions}>
+            <View style={styles.heroTopSpacer} />
+            <View style={styles.heroActionGroup}>
+              <TouchableOpacity style={styles.heroActionButton} activeOpacity={0.85}>
+                <Ionicons name="notifications-outline" size={20} color={COLORS.textNavy} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.heroActionButton}
+                activeOpacity={0.85}
+                onPress={handleLogout}
+              >
+                <Ionicons name="log-out-outline" size={20} color={COLORS.textNavy} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.heroProfileRow}>
+            <View style={styles.heroAvatarShell}>
+              <AvatarGradient size={88} />
+            </View>
+            <View style={styles.heroContent}>
+              <Text style={styles.heroWelcomeText}>Welcome Back!</Text>
+              <Text style={styles.heroMemberName}>{memberName}</Text>
+              <View style={styles.heroStatusPill}>
+                <View style={styles.heroStatusDot} />
+                <Text style={styles.heroStatusText}>
+                  {status || (isMembershipActive ? "Active" : "Inactive")}
+                </Text>
+              </View>
+              <View style={styles.heroMetaRow}>
+                <Ionicons name="home-outline" size={14} color="#FFFFFF" />
+                <Text style={styles.heroMetaText}>
+                  {roomOwnerName !== "N/A" ? `Room Owner: ${roomOwnerName}` : "Room Owner: N/A"}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
+
+      <View style={styles.profileCardsWrap}>
         {error && (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
 
-        {!billingOnly && (
-          <>
-            <Card>
-              <View style={styles.profileHeaderRow}>
-                <View style={styles.avatarStack}>
-                  <AvatarGradient />
-                </View>
+        <View style={styles.premiumProfileCard}>
+          <SectionHeaderBlock
+            iconName="person-outline"
+            iconColor={COLORS.primaryTeal}
+            iconBg="#E8F8F5"
+            title="Personal Information"
+            subtitle="Your personal details and contact info"
+          />
+          <PremiumInfoRow icon="person-outline" label="Name" value={memberName} />
+          <PremiumInfoRow icon="call-outline" label="Phone" value={phone} />
+          <PremiumInfoRow icon="mail-outline" label="Email" value={email} last />
+        </View>
 
-                <View style={styles.profileHeaderTextWrapper}>
-                  <View style={styles.nameRow}>
-                    <Text style={styles.memberName}>{memberName}</Text>
-                    <StatusBadge
-                      variant={membershipBadgeVariant}
-                      label={status || (isMembershipActive ? "Active" : "Inactive")}
-                    />
+        <View style={styles.premiumProfileCard}>
+          <SectionHeaderBlock
+            iconName="restaurant-outline"
+            iconColor={COLORS.primaryTeal}
+            iconBg="#E8F8F5"
+            title="Membership Information"
+            subtitle="Your membership and meal plan details"
+          />
+          <PremiumInfoRow
+            icon="calendar-outline"
+            label="Joining Date"
+            value={joiningDate}
+          />
+          <PremiumInfoRow
+            icon="sparkles-outline"
+            label="Membership Status"
+            value={
+              <StatusBadge
+                variant={membershipBadgeVariant}
+                label={status || (isMembershipActive ? "Active" : "Inactive")}
+              />
+            }
+          />
+          <PremiumInfoRow
+            icon="restaurant-outline"
+            label="Meal Plan"
+            value={<PillBadge label={mealPlanPillLabel} />}
+            last
+          />
+        </View>
+
+        <View style={styles.premiumProfileCard}>
+          <SectionHeaderBlock
+            iconName="settings-outline"
+            iconColor={COLORS.primaryTeal}
+            iconBg="#E8F8F5"
+            title="Account & Settings"
+            subtitle="Manage your account and preferences"
+          />
+          <View style={styles.settingsGrid}>
+            {settingsItems.map((item) => (
+              <TouchableOpacity
+                key={item.key}
+                style={styles.settingMiniCard}
+                activeOpacity={0.85}
+              >
+                <View style={styles.settingMiniTopRow}>
+                  <View style={styles.settingMiniIconBox}>
+                    <Ionicons name={item.icon} size={20} color={COLORS.primaryTeal} />
                   </View>
-
-                  <Text style={styles.memberMeta}>
-                    {roomOwnerName !== "N/A" ? `Room Owner: ${roomOwnerName}` : ""}
-                  </Text>
+                  <Ionicons name="chevron-forward" size={18} color="#A6AFB8" />
                 </View>
-              </View>
-            </Card>
-
-            <View style={styles.sectionSpacer} />
-
-            <Card>
-              <SectionHeader
-                icon={
-                  <Ionicons
-                    name="person-outline"
-                    size={18}
-                    color={COLORS.sectionPersonal}
-                  />
-                }
-                title="Personal Info"
-              />
-
-              <View style={styles.sectionBody}>
-                <FieldRow icon="person" label="Name" value={memberName} />
-                <FieldRow icon="call-outline" label="Phone" value={phone} />
-                <FieldRow icon="mail-outline" label="Email" value={email} />
-              </View>
-            </Card>
-
-            <View style={styles.sectionSpacer} />
-
-            <Card>
-              <SectionHeader
-                icon={
-                  <Ionicons
-                    name="restaurant-outline"
-                    size={18}
-                    color={COLORS.sectionMembership}
-                  />
-                }
-                title="Membership Info"
-              />
-
-              <View style={styles.sectionBody}>
-                <FieldRow
-                  icon="calendar-outline"
-                  label="Joining Date"
-                  value={joiningDate}
-                />
-
-                <View style={styles.pillRow}>
-                  <Text style={styles.fieldLabel}>Status</Text>
-                  <StatusBadge
-                    variant={membershipBadgeVariant}
-                    label={status || (isMembershipActive ? "Active" : "Inactive")}
-                  />
-                </View>
-
-                <View style={styles.pillRow}>
-                  <Text style={styles.fieldLabel}>Meal Plan</Text>
-                  <PillBadge label={mealPlanPillLabel} />
-                </View>
-              </View>
-            </Card>
-
-            <View style={styles.sectionSpacer} />
-          </>
-        )}
-
-        <Card>
-          <SectionHeader
-            icon={
-              <Ionicons
-                name="wallet-outline"
-                size={18}
-                color={COLORS.sectionBilling}
-              />
-            }
-            title="Billing Info"
-          />
-
-          <View style={styles.sectionBody}>
-            <FieldRow
-              icon="wallet-outline"
-              label="Total Mess Fee"
-              value={totalMessFee}
-            />
-
-            <View style={styles.dueRow}>
-              <View style={styles.dueRowLeft}>
-                <View style={styles.iconCircleSoft}>
-                  <Ionicons
-                    name="cash-outline"
-                    size={16}
-                    color={COLORS.sectionBilling}
-                  />
-                </View>
-                <Text style={styles.fieldLabel}>Due Amount</Text>
-              </View>
-
-              <View style={styles.dueRowRight}>
-                {dueStatus ? (
-                  <StatusBadge
-                    variant={dueStatus.variant}
-                    label={dueStatus.label}
-                    small
-                  />
-                ) : null}
-                <Text style={styles.dueValue}>{dueAmount}</Text>
-              </View>
-            </View>
-
-            <View style={styles.progressBlock}>
-              <View style={styles.progressLabelRow}>
-                <Text style={styles.progressLabel}>Payment Status</Text>
-                <Text style={styles.progressPercent}>{percentPaid}% Paid</Text>
-              </View>
-              <ProgressBar ratio={paymentProgressRatio} />
-            </View>
-
-            <Divider />
-
-            <View style={styles.pillRow}>
-              <Text style={styles.fieldLabel}>
-                {language === "mr"
-                  ? "एकूण (Due असलेले महिने)"
-                  : "Combined (Due months)"}
-              </Text>
-              <Text style={styles.totalValue}>
-                ₹{Number(combinedDueMonthsTotalBill || 0).toLocaleString("en-IN")}
-              </Text>
-            </View>
+                <Text style={styles.settingMiniTitle}>{item.title}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        </Card>
+        </View>
 
-        <View style={styles.sectionSpacer} />
-
-        <Card>
-          <SectionHeader
-            icon={
-              <Ionicons
-                name="time-outline"
-                size={18}
-                color={COLORS.sectionMonthly}
-              />
-            }
-            title="Monthly Breakdown"
-          />
-
-          <View style={styles.sectionBody}>
-            {monthlyDueBills.length > 0 ? (
-              monthlyDueBills.map((b, idx) => {
-                const m = b?.month ? new Date(b.month) : null;
-                const monthLabel =
-                  m && !Number.isNaN(m.getTime())
-                    ? m.toLocaleString("en-IN", {
-                        month: "short",
-                        year: "numeric",
-                      })
-                    : `Month ${idx + 1}`;
-
-                const totalBill = Number(b?.totalBill || 0);
-                const remaining = Number(b?.remainingAmount || 0);
-                const isRemainingDue = remaining > 0;
-                const badge = isRemainingDue
-                  ? {
-                      variant: "due",
-                      label: language === "mr" ? "बाकी" : "Due",
-                    }
-                  : {
-                      variant: "active",
-                      label: language === "mr" ? "Paid" : "Paid",
-                    };
-
-                return (
-                  <MonthlyBreakdownItem
-                    key={`${String(b?.month || monthLabel)}-${idx}`}
-                    monthLabel={monthLabel}
-                    totalBill={totalBill}
-                    remaining={remaining}
-                    badge={badge}
-                    language={language}
-                  />
-                );
-              })
-            ) : (
-              <EmptyState language={language} />
-            )}
+        <TouchableOpacity
+          style={styles.logoutActionCard}
+          activeOpacity={0.88}
+          onPress={handleLogout}
+        >
+          <View style={styles.logoutActionLeft}>
+            <View style={styles.logoutActionIconBox}>
+              <Ionicons name="log-out-outline" size={20} color="#E46B5D" />
+            </View>
+            <Text style={styles.logoutActionText}>Logout</Text>
           </View>
-        </Card>
-      </ScrollView>
+          <Ionicons name="chevron-forward" size={20} color="#D28981" />
+        </TouchableOpacity>
+
+        <View style={styles.profileSummaryCard}>
+          <SectionHeaderBlock
+            iconName="wallet-outline"
+            iconColor="#D97706"
+            iconBg="#FFF3E6"
+            title="Billing Snapshot"
+            subtitle="Quick summary of your current dues"
+          />
+          <PremiumInfoRow icon="wallet-outline" label="Total Mess Fee" value={totalMessFee} />
+          <PremiumInfoRow
+            icon="cash-outline"
+            label="Due Amount"
+            value={dueStatus ? <StatusWithValue badge={dueStatus} value={dueAmount} /> : dueAmount}
+          />
+          <View style={styles.progressBlock}>
+            <View style={styles.progressLabelRow}>
+              <Text style={styles.progressLabel}>Payment Status</Text>
+              <Text style={styles.progressPercent}>{percentPaid}% Paid</Text>
+            </View>
+            <ProgressBar ratio={paymentProgressRatio} />
+          </View>
+          <View style={styles.summaryInlineRow}>
+            <Text style={styles.summaryInlineLabel}>Combined Due Months</Text>
+            <Text style={styles.summaryInlineValue}>
+              ₹{Number(combinedDueMonthsTotalBill || 0).toLocaleString("en-IN")}
+            </Text>
+          </View>
+        </View>
+      </View>
+    </ScrollView>
   );
+
+  const standaloneBottomNav = !embedded && !billingOnly ? (
+    <View style={styles.bottomBarWrap}>
+      <View style={styles.bottomBar}>
+        {navItems.map((tab) => {
+          const isActive = tab.key === "profile";
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              style={styles.bottomTab}
+              activeOpacity={0.85}
+              onPress={() => handleTabPress(tab.key)}
+            >
+              <Ionicons
+                name={tab.icon}
+                size={isActive ? 24 : 21}
+                color={isActive ? COLORS.primaryTeal : "#9AA5B1"}
+              />
+              <Text style={[styles.bottomTabLabel, isActive && styles.bottomTabLabelActive]}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  ) : null;
 
   return (
     <SafeAreaView style={styles.container}>
-      {!embedded && (
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="arrow-back" size={24} color={COLORS.primaryText} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <View style={styles.headerRightSpacer} />
-        </View>
-      )}
-
-      {content}
+      {billingOnly ? <MemberBill /> : content}
+      {standaloneBottomNav}
     </SafeAreaView>
   );
 };
@@ -447,6 +470,15 @@ const COLORS = {
   sectionMembership: "#0F766E",
   sectionBilling: "#D97706",
   sectionMonthly: "#7C3AED",
+  primaryTeal: "#0F8F88",
+  bgPremium: "#F5F7FA",
+  textNavy: "#101828",
+  mutedText: "#6B7280",
+  orangeAccent: "#F59E0B",
+  purpleAccent: "#8B5CF6",
+  redAccent: "#E11D48",
+  greenAccent: "#16A34A",
+  headerPattern: "rgba(255,255,255,0.14)",
 };
 
 function Divider() {
@@ -504,6 +536,61 @@ function SectionHeader({ icon, title }) {
   );
 }
 
+function SectionHeaderBlock({
+  iconName,
+  iconColor,
+  iconBg,
+  title,
+  subtitle,
+  actionLabel,
+}) {
+  return (
+    <View style={styles.sectionBlockHeader}>
+      <View style={styles.sectionBlockLeft}>
+        <View style={[styles.sectionBlockIcon, { backgroundColor: iconBg }]}>
+          <Ionicons name={iconName} size={17} color={iconColor} />
+        </View>
+        <View>
+          <Text style={styles.sectionBlockTitle}>{title}</Text>
+          <Text style={styles.sectionBlockSubtitle}>{subtitle}</Text>
+        </View>
+      </View>
+      {actionLabel ? <Text style={styles.sectionActionText}>{actionLabel}</Text> : null}
+    </View>
+  );
+}
+
+function PremiumInfoRow({ icon, label, value, last = false }) {
+  const isTextValue = typeof value === "string" || typeof value === "number";
+
+  return (
+    <View style={[styles.premiumInfoRow, last && styles.premiumInfoRowLast]}>
+      <View style={styles.premiumInfoLeft}>
+        <View style={styles.premiumInfoIconBox}>
+          <Ionicons name={icon} size={18} color={COLORS.primaryTeal} />
+        </View>
+        <Text style={styles.premiumInfoLabel}>{label}</Text>
+      </View>
+      {isTextValue ? (
+        <Text style={styles.premiumInfoValue} numberOfLines={1}>
+          {value}
+        </Text>
+      ) : (
+        <View style={styles.premiumInfoCustomValue}>{value}</View>
+      )}
+    </View>
+  );
+}
+
+function StatusWithValue({ badge, value }) {
+  return (
+    <View style={styles.statusWithValue}>
+      <StatusBadge variant={badge.variant} label={badge.label} small />
+      <Text style={styles.statusWithValueText}>{value}</Text>
+    </View>
+  );
+}
+
 function FieldRow({ icon, label, value }) {
   return (
     <View style={styles.fieldRow}>
@@ -520,8 +607,7 @@ function FieldRow({ icon, label, value }) {
   );
 }
 
-function AvatarGradient() {
-  const size = 76;
+function AvatarGradient({ size = 76 }) {
   const r = size / 2;
   return (
     <View
@@ -610,79 +696,393 @@ function EmptyState({ language }) {
   );
 }
 
-function ProfileSkeleton() {
-  return (
-    <View>
-      <View style={styles.skelHeaderRow}>
-        <View style={[styles.skelAvatar, { backgroundColor: "#E5E7EB" }]} />
-        <View style={{ flex: 1, marginLeft: 16 }}>
-          <View style={[styles.skelLine, { width: "70%" }]} />
-          <View style={[styles.skelLine, { width: "52%", marginTop: 10 }]} />
-        </View>
-      </View>
-
-      <View style={{ height: 16 }} />
-
-      <SkeletonCard />
-      <View style={{ height: 16 }} />
-      <SkeletonCard />
-      <View style={{ height: 16 }} />
-      <SkeletonCard />
-      <View style={{ height: 16 }} />
-      <SkeletonCard />
-    </View>
-  );
-}
-
-function SkeletonCard() {
-  return (
-    <View style={styles.skeletonCard}>
-      <View style={styles.skelHeader}>
-        <View
-          style={[
-            styles.skelIconCircle,
-            { backgroundColor: "#E5E7EB" },
-          ]}
-        />
-        <View style={[styles.skelLine, { width: 160, height: 14 }]} />
-      </View>
-      <View style={styles.skelRows}>
-        <View style={styles.skelRow}>
-          <View
-            style={[
-              styles.skelIconMini,
-              { backgroundColor: "#E5E7EB" },
-            ]}
-          />
-          <View style={[styles.skelLine, { width: 120 }]} />
-        </View>
-        <View style={styles.skelRow}>
-          <View
-            style={[
-              styles.skelIconMini,
-              { backgroundColor: "#E5E7EB" },
-            ]}
-          />
-          <View style={[styles.skelLine, { width: 90 }]} />
-        </View>
-        <View style={styles.skelRow}>
-          <View
-            style={[
-              styles.skelIconMini,
-              { backgroundColor: "#E5E7EB" },
-            ]}
-          />
-          <View style={[styles.skelLine, { width: 140 }]} />
-        </View>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: COLORS.bgPremium,
+  },
+
+  profileScreen: {
+    flex: 1,
+    backgroundColor: COLORS.bgPremium,
+  },
+
+  profileScrollContent: {
+    paddingBottom: 28,
+  },
+
+  profileScrollContentStandalone: {
+    paddingBottom: 120,
+  },
+
+  heroCard: {
+    backgroundColor: COLORS.primaryTeal,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    paddingTop: 10,
+    paddingHorizontal: 18,
+    paddingBottom: 28,
+    overflow: "hidden",
+  },
+
+  heroPatternOne: {
+    position: "absolute",
+    top: 10,
+    left: 18,
+  },
+
+  heroPatternTwo: {
+    position: "absolute",
+    top: 18,
+    left: "42%",
+  },
+
+  heroPatternThree: {
+    position: "absolute",
+    top: 14,
+    right: 22,
+  },
+
+  heroPatternFour: {
+    position: "absolute",
+    top: 96,
+    right: 70,
+  },
+
+  heroTopActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  heroTopSpacer: {
+    width: 44,
+    height: 44,
+  },
+
+  heroActionGroup: {
+    flexDirection: "row",
+    gap: 12,
+  },
+
+  heroActionButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+
+  heroProfileRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 18,
+  },
+
+  heroAvatarShell: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 4,
+    borderColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+
+  heroContent: {
+    flex: 1,
+    marginLeft: 16,
+  },
+
+  heroWelcomeText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.92)",
+  },
+
+  heroMemberName: {
+    marginTop: 4,
+    fontSize: 24,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
+  heroStatusPill: {
+    alignSelf: "flex-start",
+    marginTop: 12,
+    backgroundColor: "#E7F8EE",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  heroStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.greenAccent,
+    marginRight: 8,
+  },
+
+  heroStatusText: {
+    color: "#198754",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+
+  heroMetaRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  heroMetaText: {
+    marginLeft: 8,
+    color: "#E8FFFD",
+    fontSize: 13,
+    fontWeight: "500",
+    flexShrink: 1,
+  },
+
+  profileCardsWrap: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+  },
+
+  premiumProfileCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+
+  premiumInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EDF2F6",
+  },
+
+  premiumInfoRowLast: {
+    borderBottomWidth: 0,
+    paddingBottom: 0,
+  },
+
+  premiumInfoLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    paddingRight: 10,
+  },
+
+  premiumInfoIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: "#F1FBFA",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+
+  premiumInfoLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#7A8594",
+  },
+
+  premiumInfoValue: {
+    maxWidth: "58%",
+    fontSize: 15,
+    fontWeight: "800",
+    color: COLORS.textNavy,
+    textAlign: "right",
+  },
+
+  premiumInfoCustomValue: {
+    alignItems: "flex-end",
+    maxWidth: "58%",
+  },
+
+  settingsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 12,
+  },
+
+  settingMiniCard: {
+    width: "48.3%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#EEF2F6",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+
+  settingMiniTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+
+  settingMiniIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#F1FBFA",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  settingMiniTitle: {
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "800",
+    color: COLORS.textNavy,
+  },
+
+  logoutActionCard: {
+    backgroundColor: "#FFF1F0",
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    marginBottom: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 1,
+  },
+
+  logoutActionLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  logoutActionIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+
+  logoutActionText: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#D65A4C",
+  },
+
+  profileSummaryCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 18,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+
+  summaryInlineRow: {
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  summaryInlineLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#7A8594",
+  },
+
+  summaryInlineValue: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: COLORS.textNavy,
+  },
+
+  statusWithValue: {
+    alignItems: "flex-end",
+    gap: 6,
+  },
+
+  statusWithValueText: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: COLORS.textNavy,
+  },
+
+  bottomBarWrap: {
+    position: "absolute",
+    left: 14,
+    right: 14,
+    bottom: 16,
+  },
+
+  bottomBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 26,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 10,
+  },
+
+  bottomTab: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  bottomTabLabel: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#9AA5B1",
+  },
+
+  bottomTabLabelActive: {
+    color: COLORS.primaryTeal,
+    fontWeight: "800",
   },
 
   header: {
@@ -725,12 +1125,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 32,
   },
 
   profileHeaderRow: {
@@ -898,16 +1292,16 @@ const styles = StyleSheet.create({
   },
 
   pillBadge: {
-    backgroundColor: COLORS.softAccentBg,
+    backgroundColor: "#F4F6FB",
     borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     maxWidth: "60%",
   },
 
   pillBadgeText: {
     color: COLORS.primaryText,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "900",
   },
 
@@ -928,11 +1322,11 @@ const styles = StyleSheet.create({
   },
 
   badgeActive: {
-    backgroundColor: COLORS.activeBg,
+    backgroundColor: "#E8F8EE",
   },
 
   badgeDue: {
-    backgroundColor: COLORS.dueBg,
+    backgroundColor: "#FFF0F0",
   },
 
   badgeText: {
@@ -946,11 +1340,11 @@ const styles = StyleSheet.create({
   },
 
   badgeTextActive: {
-    color: COLORS.activeAccent,
+    color: "#198754",
   },
 
   badgeTextDue: {
-    color: COLORS.dueRed,
+    color: "#D65A4C",
   },
 
   dueRow: {
@@ -978,7 +1372,7 @@ const styles = StyleSheet.create({
   },
 
   progressBlock: {
-    marginTop: 12,
+    marginTop: 16,
     marginBottom: 4,
   },
 
@@ -990,28 +1384,28 @@ const styles = StyleSheet.create({
   },
 
   progressLabel: {
-    fontSize: 12,
-    fontWeight: "900",
-    color: COLORS.label,
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#7A8594",
   },
 
   progressPercent: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "950",
-    color: COLORS.teal,
+    color: COLORS.primaryTeal,
   },
 
   progressTrack: {
-    height: 10,
+    height: 9,
     borderRadius: 999,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: "#E7EEF3",
     overflow: "hidden",
   },
 
   progressFill: {
     height: "100%",
     borderRadius: 999,
-    backgroundColor: COLORS.teal,
+    backgroundColor: COLORS.primaryTeal,
   },
 
   totalValue: {
@@ -1078,63 +1472,366 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Skeleton UI
-  skelHeaderRow: {
+  billScreen: {
+    flex: 1,
+    backgroundColor: COLORS.bgPremium,
+  },
+  billScrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+  },
+  billHeroHeader: {
+    backgroundColor: COLORS.primaryTeal,
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 92,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: "hidden",
+  },
+  billPatternWrap: {
+    position: "absolute",
+    right: 12,
+    top: 8,
+    flexDirection: "row",
+    gap: 10,
+  },
+  billHeroTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  billRoundButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  historyPillButton: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+    gap: 6,
   },
-
-  skelAvatar: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+  historyPillText: {
+    color: "#0F4E49",
+    fontWeight: "700",
+    fontSize: 12,
   },
-
-  skelLine: {
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: "#E5E7EB",
+  billHeroTitle: {
+    marginTop: 18,
+    fontSize: 38,
+    fontWeight: "900",
+    color: "#FFFFFF",
   },
-
-  skeletonCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: 18,
+  billHeroSubtitle: {
+    marginTop: 6,
+    fontSize: 14,
+    color: "#E6FFFC",
+    fontWeight: "500",
+  },
+  floatingSummaryCard: {
+    backgroundColor: "#FFFFFF",
+    marginTop: -72,
+    borderRadius: 24,
     padding: 16,
-    shadowColor: COLORS.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 4,
   },
-
-  skelHeader: {
+  summaryRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "stretch",
+  },
+  summaryCol: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  summaryColWide: {
+    flex: 1.4,
+    paddingLeft: 0,
+  },
+  summaryColDivider: {
+    width: 1,
+    backgroundColor: "#EDF0F3",
+  },
+  summaryMonth: {
+    color: COLORS.textNavy,
+    fontSize: 24,
+    fontWeight: "800",
+    marginBottom: 2,
+  },
+  summaryLabel: {
+    color: "#7C8793",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  summaryPrimaryAmount: {
+    color: COLORS.primaryTeal,
+    fontSize: 42,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+  summaryTealAmount: {
+    color: COLORS.primaryTeal,
+    fontSize: 29,
+    fontWeight: "800",
+    marginTop: 8,
+  },
+  summaryRedAmount: {
+    color: COLORS.redAccent,
+    fontSize: 29,
+    fontWeight: "800",
+    marginTop: 8,
+  },
+  partialBadge: {
+    alignSelf: "flex-start",
+    marginTop: 8,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#FFE9EC",
+  },
+  partialBadgeText: {
+    color: COLORS.redAccent,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  summaryProgressTrack: {
+    marginTop: 14,
+    height: 8,
+    backgroundColor: "#E8EDF1",
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  summaryProgressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: COLORS.primaryTeal,
+  },
+  summaryProgressMetaRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  summaryProgressPaid: {
+    fontSize: 12,
+    color: COLORS.primaryTeal,
+    fontWeight: "700",
+  },
+  summaryProgressDue: {
+    fontSize: 12,
+    color: "#7C8793",
+    fontWeight: "700",
+  },
+  premiumCard: {
+    backgroundColor: "#FFFFFF",
+    marginTop: 14,
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  sectionBlockHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     marginBottom: 14,
   },
-
-  skelIconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    marginRight: 10,
-  },
-
-  skelRows: {
-    paddingTop: 4,
-  },
-
-  skelRow: {
+  sectionBlockLeft: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
   },
-
-  skelIconMini: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  sectionBlockIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 10,
+  },
+  sectionBlockTitle: {
+    fontSize: 22,
+    color: COLORS.textNavy,
+    fontWeight: "800",
+  },
+  sectionBlockSubtitle: {
+    fontSize: 13,
+    color: COLORS.mutedText,
+    marginTop: 3,
+    fontWeight: "500",
+  },
+  sectionActionText: {
+    color: COLORS.primaryTeal,
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  chargesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 10,
+  },
+  chargeMiniCard: {
+    width: "48.6%",
+    borderRadius: 16,
+    padding: 12,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#EFF2F6",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 1,
+  },
+  chargeIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 9,
+  },
+  chargeTitle: {
+    color: "#566273",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  chargeAmount: {
+    color: COLORS.textNavy,
+    fontSize: 28,
+    fontWeight: "800",
+    marginTop: 3,
+  },
+  chargeAmountNegative: {
+    color: COLORS.redAccent,
+  },
+  chargePercent: {
+    marginTop: 2,
+    fontSize: 13,
+    color: "#5F7285",
+    fontWeight: "700",
+  },
+  finalTotalStrip: {
+    marginTop: 12,
+    borderRadius: 12,
+    backgroundColor: COLORS.primaryTeal,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  finalTotalLabel: {
+    color: "#FFFFFF",
+    fontSize: 31,
+    fontWeight: "800",
+  },
+  finalTotalValue: {
+    color: "#FFFFFF",
+    fontSize: 33,
+    fontWeight: "900",
+  },
+  itemDivider: {
+    height: 1,
+    backgroundColor: "#EBEFF3",
+    marginVertical: 12,
+  },
+  paymentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  paymentDate: {
+    fontSize: 15,
+    color: COLORS.textNavy,
+    fontWeight: "800",
+  },
+  paymentMethod: {
+    marginTop: 5,
+    color: "#687687",
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  paymentRightBlock: {
+    alignItems: "flex-end",
+  },
+  paymentAmount: {
+    color: COLORS.primaryTeal,
+    fontSize: 24,
+    fontWeight: "800",
+  },
+  paidBadgeRow: {
+    marginTop: 6,
+    backgroundColor: "#E6F8EF",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  paidBadgeText: {
+    color: COLORS.greenAccent,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  paidDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.greenAccent,
+    marginLeft: 6,
+  },
+  previousRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  previousMonth: {
+    color: COLORS.textNavy,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  previousRightBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    columnGap: 8,
+  },
+  previousAmount: {
+    color: COLORS.textNavy,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  downloadButton: {
+    backgroundColor: COLORS.primaryTeal,
+    marginTop: 14,
+    borderRadius: 999,
+    paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  downloadButtonText: {
+    marginLeft: 8,
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
   },
 });

@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,11 +20,6 @@ const SnackOrderPage = ({ embedded = false }) => {
 
   const [studentId, setStudentId] = useState(null);
   const [memberName, setMemberName] = useState("");
-  const [members, setMembers] = useState([]);
-  const [membersLoading, setMembersLoading] = useState(false);
-  const [memberSearch, setMemberSearch] = useState("");
-  const [selectedSplitMemberIds, setSelectedSplitMemberIds] = useState([]);
-  const [splitPickerVisible, setSplitPickerVisible] = useState(false);
   const [snacks, setSnacks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
@@ -105,31 +99,6 @@ const SnackOrderPage = ({ embedded = false }) => {
     fetchSnacks();
   }, [fetchSnacks]);
 
-  useEffect(() => {
-    const fetchMembers = async () => {
-      try {
-        setMembersLoading(true);
-        const res = await api.get("/api/members/split-members");
-        setMembers(Array.isArray(res.data) ? res.data : []);
-      } catch (error) {
-        console.error("Failed to load members:", {
-          url: error?.config?.url,
-          method: error?.config?.method,
-          status: error?.response?.status,
-          data: error?.response?.data,
-          message: error?.message,
-        });
-        setMembers([]);
-      } finally {
-        setMembersLoading(false);
-      }
-    };
-
-    if (studentId) {
-      fetchMembers();
-    }
-  }, [studentId]);
-
   const getQuantity = (id) => {
     const key = String(id);
     const raw = quantities[key];
@@ -159,32 +128,6 @@ const SnackOrderPage = ({ embedded = false }) => {
     (sum, s) => sum + Number(s.price || 0) * getQuantity(s._id),
     0
   );
-
-  const normalizedMemberSearch = memberSearch.trim().toLowerCase();
-  const memberOptions = members
-    .filter((m) => String(m?._id || m?.id || "").trim() !== "")
-    .map((m) => ({
-      _id: String(m._id),
-      name: m.name,
-      rollNumber: m.rollNumber,
-    }))
-    .filter((m) => (studentId ? String(m._id) !== String(studentId) : true))
-    .filter((m) => !selectedSplitMemberIds.includes(String(m._id)))
-    .filter((m) => {
-      if (!normalizedMemberSearch) return false;
-      const name = String(m.name || "").toLowerCase();
-      const roll = String(m.rollNumber || "").toLowerCase();
-      return (
-        name.includes(normalizedMemberSearch) ||
-        roll.includes(normalizedMemberSearch)
-      );
-    })
-    .slice(0, 6);
-
-  const getMemberLabel = (mid) => {
-    const m = members.find((x) => String(x?._id) === String(mid));
-    return String(m?.name || "").trim() || `Member ${mid}`;
-  };
 
   const handleBulkOrder = async () => {
     if (placingOrderRef.current) return;
@@ -236,47 +179,6 @@ const SnackOrderPage = ({ embedded = false }) => {
       const orderTotal = cartTotal;
       const orderDate = new Date().toISOString();
 
-      // Split request flow: ask selected members to approve their share.
-      if (selectedSplitMemberIds.length > 0) {
-        const participantCount = selectedSplitMemberIds.length + 1;
-
-        let snackName = "Multiple Snacks";
-        if (orderPayload.length === 1) {
-          snackName =
-            snacks.find((s) => s._id === orderPayload[0].snackId)?.name ||
-            snackName;
-        }
-
-        const res = await api.post("/api/bill-splits/request", {
-          orderItems: orderPayload.map((x) => ({
-            snackId: x.snackId,
-            quantity: x.quantity,
-          })),
-          splitMemberIds: selectedSplitMemberIds,
-          date: orderDate,
-        });
-
-        setQuantities({});
-        setSelectedSplitMemberIds([]);
-        setMemberSearch("");
-
-        router.push({
-          pathname: "/Member/SnackSplitRequestSuccess",
-          params: {
-            requestId: String(res?.data?._id || ""),
-            totalPrice: String(orderTotal),
-            memberCount: String(participantCount),
-            orderDate,
-            memberName: memberName || "",
-            quantity: String(totalItems),
-            snackName,
-          },
-        });
-
-        return;
-      }
-
-      // Normal (non-split) flow.
       const res = await api.post("/api/snack-orders/bulk-order", {
         studentId,
         orders: orderPayload.map((x) => ({
@@ -316,9 +218,6 @@ const SnackOrderPage = ({ embedded = false }) => {
       });
 
       setQuantities({});
-      // Keep normal (non-split) ordering independent from previous split selections.
-      setSelectedSplitMemberIds([]);
-      setMemberSearch("");
     } catch (error) {
       const backendMessage = error?.response?.data?.message;
       console.error("Failed to place snack order:", backendMessage || error);
@@ -340,152 +239,175 @@ const SnackOrderPage = ({ embedded = false }) => {
       item?.availability !== false && maxStock > 0 && quantity < maxStock;
 
     return (
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <View style={styles.cardTitleRow}>
-            <Ionicons
-              name="fast-food-outline"
-              size={20}
-              color="#111827"
-              style={styles.cardIcon}
-            />
-            <View>
-              <Text style={styles.snackName}>{item.name}</Text>
-              <Text style={styles.snackCategory}>
-                Category: {item.category || "Other"}
+      <View style={styles.snackCard}>
+        <View style={styles.snackTopRow}>
+          <View style={styles.thumbnailWrap}>
+            <Ionicons name="fast-food-outline" size={34} color="#0F8F88" />
+            <View style={styles.availableBadge}>
+              <Text style={styles.availableBadgeText} numberOfLines={1}>
+                Available: {getSnackAvailableLabel(item)}
               </Text>
             </View>
           </View>
-          <Text style={styles.snackPrice}>
-            ₹{price.toLocaleString("en-IN")}
-          </Text>
-        </View>
 
-        <View style={styles.availableRow}>
-          <Text style={styles.availableLabel}>Available:</Text>
-          <Text style={styles.availableValue}>
-            {getSnackAvailableLabel(item)}
-          </Text>
-        </View>
-
-        <View style={styles.quantityRow}>
-          <Text style={styles.quantityLabel}>Quantity</Text>
-          <View style={styles.quantityControls}>
-            <TouchableOpacity
-              style={styles.qtyButton}
-              onPress={() => updateQuantity(item._id, -1)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="remove" size={18} color="#111827" />
-            </TouchableOpacity>
-            <Text style={styles.qtyValue}>{quantity}</Text>
-            <TouchableOpacity
-              style={[styles.qtyButton, !canIncrease ? { opacity: 0.45 } : null]}
-              onPress={() => {
-                if (!canIncrease) return;
-                updateQuantity(item._id, 1);
-              }}
-              activeOpacity={0.7}
-              disabled={!canIncrease}
-            >
-              <Ionicons name="add" size={18} color="#111827" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.footerRow}>
-          <View style={styles.totalPill}>
-            <Ionicons name="cash-outline" size={16} color="#065F46" />
-            <Text style={styles.totalPillText}>
-              Total: ₹{(price * quantity).toLocaleString("en-IN")}
+          <View style={styles.detailsCol}>
+            <Text style={styles.snackName} numberOfLines={1}>
+              {item.name}
             </Text>
+            <View style={styles.categoryRow}>
+              <Ionicons name="restaurant-outline" size={14} color="#6B7280" />
+              <Text style={styles.snackCategory}>
+                Category: {item.category || "Food"}
+              </Text>
+            </View>
+
+            <View style={styles.priceQtyRow}>
+              <Text style={styles.snackPrice}>₹{price.toLocaleString("en-IN")}</Text>
+              <View style={styles.qtyPill}>
+                <TouchableOpacity
+                  style={styles.qtyCircleButton}
+                  onPress={() => updateQuantity(item._id, -1)}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons name="remove" size={16} color="#475569" />
+                </TouchableOpacity>
+                <View
+                  style={[
+                    styles.qtyValueWrap,
+                    quantity > 0 && styles.qtyValueWrapActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.qtyValue,
+                      quantity > 0 && styles.qtyValueActive,
+                    ]}
+                  >
+                    {quantity}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.qtyCircleButton,
+                    !canIncrease && styles.qtyCircleButtonDisabled,
+                  ]}
+                  onPress={() => {
+                    if (!canIncrease) return;
+                    updateQuantity(item._id, 1);
+                  }}
+                  activeOpacity={0.75}
+                  disabled={!canIncrease}
+                >
+                  <Ionicons name="add" size={16} color="#475569" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
+        </View>
+
+        <View style={styles.itemTotalRow}>
+          <Text style={styles.itemTotalLabel}>Item Total</Text>
+          <Text style={styles.itemTotalAmount}>
+            ₹{(price * quantity).toLocaleString("en-IN")}
+          </Text>
         </View>
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {!embedded && (
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="arrow-back" size={24} color="#111827" />
-          </TouchableOpacity>
-          <Text style={styles.title}>Order Extra Snacks</Text>
-          <View style={styles.headerRight} />
-        </View>
-      )}
-
-      <View style={styles.subHeader}>
-        <Text style={styles.subtitle}>
-          Select snacks and place your order.
-        </Text>
-        <TouchableOpacity
-          style={styles.historyLink}
-          onPress={() => router.push("/Member/SnackOrderHistory")}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="time-outline" size={16} color="#065F46" />
-          <Text style={styles.historyLinkText}>Order History</Text>
-        </TouchableOpacity>
+    <SafeAreaView
+      style={styles.container}
+      edges={embedded ? ["top", "left", "right"] : ["top", "left", "right", "bottom"]}
+    >
+      <View style={styles.headerBackground}>
+        <Ionicons
+          name="fast-food-outline"
+          size={58}
+          color="rgba(255,255,255,0.09)"
+          style={styles.patternTopLeft}
+        />
+        <Ionicons
+          name="wine-outline"
+          size={48}
+          color="rgba(255,255,255,0.09)"
+          style={styles.patternTopRight}
+        />
+        <Ionicons
+          name="restaurant-outline"
+          size={52}
+          color="rgba(255,255,255,0.09)"
+          style={styles.patternBottomRight}
+        />
       </View>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#111827" />
+      <View style={styles.headerContent}>
+        <View style={styles.headerTopRow}>
+          {!embedded ? (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="arrow-back" size={22} color="#0F8F88" />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.headerSpacer} />
+          )}
+
+          <TouchableOpacity
+            style={styles.historyLink}
+            onPress={() => router.push("/Member/SnackOrderHistory")}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="time-outline" size={16} color="#0F8F88" />
+            <Text style={styles.historyLinkText}>Order History</Text>
+          </TouchableOpacity>
         </View>
-      ) : (
-        <FlatList
-          data={visibleSnacks}
-          keyExtractor={(item) => String(item._id)}
-          renderItem={renderSnackCard}
-          extraData={quantities}
-          contentContainerStyle={[
-            styles.listContent,
-            totalItems > 0 && { paddingBottom: 100 },
-          ]}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="fast-food-outline" size={64} color="#D1D5DB" />
-              <Text style={styles.emptyText}>
-                No snacks available right now.
-              </Text>
-            </View>
-          }
-        />
-      )}
+
+        <Text style={styles.title}>Extra Snacks</Text>
+        <Text style={styles.subtitle}>
+          Choose your favorite snacks{"\n"}and place your order 
+        </Text>
+      </View>
+
+      <View style={styles.mainPanel}>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0F8F88" />
+          </View>
+        ) : (
+          <FlatList
+            data={visibleSnacks}
+            keyExtractor={(item) => String(item._id)}
+            renderItem={renderSnackCard}
+            extraData={quantities}
+            contentContainerStyle={[
+              styles.listContent,
+              totalItems > 0 && { paddingBottom: 220 },
+            ]}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="fast-food-outline" size={60} color="#CBD5E1" />
+                <Text style={styles.emptyText}>No snacks available right now.</Text>
+              </View>
+            }
+        
+          />
+        )}
+      </View>
 
       {totalItems > 0 && (
-        <View style={styles.floatingCart}>
-          <View>
-            <Text style={styles.cartTotalText}>
-              Total: ₹{cartTotal.toLocaleString("en-IN")}
+        <View style={[styles.floatingCart, embedded && styles.floatingCartEmbedded]}>
+          <View style={styles.cartLeft}>
+            <Text style={styles.totalAmountLabel}>Total Amount</Text>
+            <Text style={styles.cartTotalText}>₹{cartTotal.toLocaleString("en-IN")}</Text>
+            <Text style={styles.cartItemsText}>
+              {totalItems} item{totalItems === 1 ? "" : "s"}
             </Text>
-            <Text style={styles.cartItemsText}>{totalItems} items</Text>
-
-            <TouchableOpacity
-              style={styles.splitBillLink}
-              onPress={() => setSplitPickerVisible(true)}
-              activeOpacity={0.85}
-            >
-              <Ionicons
-                name="people-outline"
-                size={16}
-                color="#D1D5DB"
-              />
-              <Text style={styles.splitBillLinkText}>
-                {selectedSplitMemberIds.length > 0
-                  ? `Split with ${selectedSplitMemberIds.length + 1} members`
-                  : "Split bill (optional)"}
-              </Text>
-            </TouchableOpacity>
           </View>
+
           <TouchableOpacity
             style={styles.placeOrderButton}
             onPress={handleBulkOrder}
@@ -493,147 +415,16 @@ const SnackOrderPage = ({ embedded = false }) => {
             activeOpacity={0.85}
           >
             {isPlacingOrder ? (
-              <ActivityIndicator size="small" color="#111827" />
+              <ActivityIndicator size="small" color="#0F8F88" />
             ) : (
-              <Text style={styles.placeOrderButtonText}>Place Order</Text>
+              <View style={styles.placeOrderButtonContent}>
+                <Text style={styles.placeOrderButtonText}>Place Order</Text>
+                <Ionicons name="chevron-forward" size={17} color="#0F8F88" />
+              </View>
             )}
           </TouchableOpacity>
         </View>
       )}
-
-      <Modal
-        visible={splitPickerVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSplitPickerVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Split Bill</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setSplitPickerVisible(false);
-                  setMemberSearch("");
-                }}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="close" size={22} color="#111827" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalSubtitle}>
-              Search members and select who should approve their share.
-            </Text>
-
-            <View style={styles.memberSearchRow}>
-              <Ionicons name="search" size={18} color="#6B7280" />
-              <TextInput
-                style={styles.memberSearchInput}
-                value={memberSearch}
-                onChangeText={setMemberSearch}
-                placeholder={
-                  membersLoading
-                    ? "Loading members..."
-                    : "Search by name or roll no"
-                }
-                editable={!membersLoading}
-              />
-            </View>
-
-            {memberSearch.trim().length > 0 && (
-              <View style={styles.memberSuggestionsBox}>
-                {memberOptions.length === 0 ? (
-                  <Text style={styles.memberSuggestionEmpty}>
-                    No members found.
-                  </Text>
-                ) : (
-                  memberOptions.map((m) => (
-                    <TouchableOpacity
-                      key={m._id}
-                      style={styles.memberSuggestionRow}
-                      onPress={() => {
-                        setSelectedSplitMemberIds((prev) => {
-                          if (prev.includes(m._id)) return prev;
-                          return [...prev, m._id];
-                        });
-                        setMemberSearch("");
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.memberSuggestionName}>
-                          {m.name}
-                        </Text>
-                        {!!m.rollNumber && (
-                          <Text style={styles.memberSuggestionMeta}>
-                            {m.rollNumber}
-                          </Text>
-                        )}
-                      </View>
-                      <Ionicons
-                        name="add-circle-outline"
-                        size={20}
-                        color="#065F46"
-                      />
-                    </TouchableOpacity>
-                  ))
-                )}
-              </View>
-            )}
-
-            {selectedSplitMemberIds.length > 0 ? (
-              <View style={styles.selectedMembersWrap}>
-                {selectedSplitMemberIds.map((mid) => (
-                  <View key={mid} style={styles.memberChip}>
-                    <Text style={styles.memberChipText}>
-                      {getMemberLabel(mid)}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() =>
-                        setSelectedSplitMemberIds((prev) =>
-                          prev.filter((x) => String(x) !== String(mid))
-                        )
-                      }
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name="close-circle"
-                        size={16}
-                        color="#6B7280"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <Text style={styles.noSelectedText}>
-                No members selected yet.
-              </Text>
-            )}
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.secondaryModalButton}
-                onPress={() => {
-                  setSelectedSplitMemberIds([]);
-                  setMemberSearch("");
-                }}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.secondaryModalButtonText}>Clear</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.primaryModalButton}
-                onPress={() => setSplitPickerVisible(false)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.primaryModalButtonText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -643,38 +434,86 @@ export default SnackOrderPage;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#F5F7FA",
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  headerBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 280,
+    backgroundColor: "#0F8F88",
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  patternTopLeft: {
+    position: "absolute",
+    top: 16,
+    left: 22,
+  },
+  patternTopRight: {
+    position: "absolute",
+    top: 30,
+    right: 56,
+  },
+  patternBottomRight: {
+    position: "absolute",
+    top: 102,
+    right: 24,
+  },
+  headerContent: {
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
+    paddingTop: 6,
+    paddingBottom: 18,
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   backButton: {
-    padding: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#0B6A65",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  headerSpacer: {
+    width: 36,
+    height: 36,
   },
   title: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  headerRight: {
-    width: 40,
-  },
-  subHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 4,
+    marginTop: 12,
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: "800",
+    color: "#FFFFFF",
   },
   subtitle: {
-    fontSize: 14,
-    color: "#6B7280",
+    marginTop: 4,
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: "500",
+    color: "rgba(255,255,255,0.96)",
+  },
+  mainPanel: {
+    flex: 1,
+    marginTop: 8,
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: -1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 6,
+    marginBottom:-15,
   },
   loadingContainer: {
     flex: 1,
@@ -682,181 +521,243 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   listContent: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    paddingBottom: 32,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 106,
   },
-  card: {
+  snackCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    padding: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#EEF2F7",
+    shadowColor: "#0B1220",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 2,
   },
-  cardHeader: {
+  snackTopRow: {
     flexDirection: "row",
+    gap: 9,
+  },
+  thumbnailWrap: {
+    width: 86,
+    height: 82,
+    borderRadius: 10,
+    backgroundColor: "#F1F5F9",
+    position: "relative",
     alignItems: "center",
+    justifyContent: "center",
+  },
+  availableBadge: {
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    right: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "#BBF7D0",
+    alignItems: "center",
+  },
+  availableBadgeText: {
+    color: "#166534",
+    fontSize: 10,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  detailsCol: {
+    flex: 1,
     justifyContent: "space-between",
-    marginBottom: 12,
   },
-  cardTitleRow: {
+  categoryRow: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  cardIcon: {
-    marginRight: 10,
+    marginTop: 2,
+    gap: 4,
   },
   snackName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111827",
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "800",
+    color: "#0F172A",
   },
   snackCategory: {
-    marginTop: 2,
-    fontSize: 12,
+    fontSize: 11,
+    lineHeight: 14,
     color: "#6B7280",
   },
-  availableRow: {
-    marginTop: 6,
+  priceQtyRow: {
+    marginTop: 7,
     flexDirection: "row",
     alignItems: "center",
- 
-  },
-  availableLabel: {
-    fontSize: 12,
-    color: "#6B7280",
-    fontWeight: "600",
-  },
-  availableValue: {
-    fontSize: 12,
-    color: "#065F46",
-    fontWeight: "800",
+    justifyContent: "space-between",
+    gap: 8,
   },
   snackPrice: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#111827",
+    fontSize: 26,
+    lineHeight: 30,
+    fontWeight: "900",
+    color: "#0F8F88",
   },
-  quantityRow: {
+  qtyPill: {
+    height: 34,
+    minWidth: 102,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 3,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
   },
-  quantityLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#374151",
-  },
-  quantityControls: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  qtyButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
+  qtyCircleButton: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  qtyCircleButtonDisabled: {
+    opacity: 0.4,
+  },
+  qtyValueWrap: {
+    minWidth: 28,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qtyValueWrapActive: {
+    backgroundColor: "#0F8F88",
+    borderRadius: 999,
   },
   qtyValue: {
-    marginHorizontal: 12,
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111827",
+    fontSize: 14,
+    lineHeight: 17,
+    fontWeight: "700",
+    color: "#0F172A",
   },
-  footerRow: {
+  qtyValueActive: {
+    color: "#FFFFFF",
+  },
+  itemTotalRow: {
+    marginTop: 8,
+    paddingTop: 7,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  totalPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "#ECFDF5",
-    gap: 6,
-  },
-  totalPillText: {
-    fontSize: 13,
+  itemTotalLabel: {
+    fontSize: 12,
+    color: "#64748B",
     fontWeight: "500",
-    color: "#065F46",
   },
-  orderButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: "#111827",
-    gap: 6,
-  },
-  orderButtonDisabled: {
-    opacity: 0.7,
-  },
-  orderButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
+  itemTotalAmount: {
+    fontSize: 21,
+    lineHeight: 25,
+    fontWeight: "800",
+    color: "#0F8F88",
   },
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 24,
-    paddingVertical: 80,
+    paddingVertical: 56,
   },
   emptyText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: "#6B7280",
+    marginTop: 10,
+    fontSize: 14,
+    color: "#64748B",
     textAlign: "center",
+  },
+  infoCard: {
+    marginTop: 2,
+    marginBottom: 14,
+    borderRadius: 12,
+    backgroundColor: "#DFF5EF",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  infoCardText: {
+    flex: 1,
+    color: "#0E7490",
+    fontSize: 13,
+    fontWeight: "500",
   },
   floatingCart: {
     position: "absolute",
-    bottom: 24,
-    left: 20,
-    right: 20,
-    backgroundColor: "#111827",
-    borderRadius: 16,
-    padding: 16,
+    bottom: 18,
+    left: 16,
+    right: 16,
+    backgroundColor: "#0F8F88",
+    borderRadius: 18,
+    padding: 12,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+  floatingCartEmbedded: {
+    bottom: 78,
+    marginBottom: 12,
+  },
+  cartLeft: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  totalAmountLabel: {
+    color: "#E6FFFB",
+    fontSize: 12,
+    fontWeight: "600",
   },
   cartTotalText: {
     color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 22,
+    lineHeight: 26,
+    fontWeight: "900",
+    marginTop: 2,
   },
   cartItemsText: {
-    color: "#D1D5DB",
-    fontSize: 13,
-    marginTop: 2,
+    color: "#D7F4EF",
+    fontSize: 12,
+    marginTop: 1,
+    fontWeight: "600",
   },
   placeOrderButton: {
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    minWidth: 124,
+    minHeight: 42,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     borderRadius: 999,
+    justifyContent: "center",
+  },
+  placeOrderButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
   },
   placeOrderButtonText: {
-    color: "#111827",
-    fontSize: 14,
+    color: "#0F172A",
+    fontSize: 15,
+    lineHeight: 18,
     fontWeight: "700",
   },
 
@@ -865,31 +766,39 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    alignSelf: "flex-start",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#CCFBF1",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    shadowColor: "#0B1220",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 2,
   },
   splitBillLinkText: {
-    marginTop: -1,
-    color: "#D1D5DB",
-    fontSize: 12,
+    color: "#0F8F88",
+    fontSize: 11,
     fontWeight: "700",
   },
 
   historyLink: {
-    marginTop: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    backgroundColor: "#ECFDF5",
-    borderColor: "#DCFCE7",
-    borderWidth: 1,
+    gap: 6,
+    backgroundColor: "#FFFFFF",
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderRadius: 999,
-    alignSelf: "flex-start",
+    alignSelf: "flex-end",
   },
   historyLinkText: {
-    fontSize: 13,
-    fontWeight: "900",
-    color: "#065F46",
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0F8F88",
   },
 
   modalOverlay: {
@@ -974,7 +883,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 14,
+    paddingBottom: 14,
+  },
+  selectedMembersScroll: {
+    maxHeight: 130,
+    marginBottom: 4,
   },
   memberChip: {
     flexDirection: "row",

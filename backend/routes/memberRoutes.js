@@ -12,11 +12,6 @@ const User = require("../models/User");
 const { calculateMemberBilling } = require("../utils/billing");
 const { resolveMemberPrimaryFields } = require("../utils/translateEnToMr");
 const { statusMrFor, mealPlanMrFor } = require("../utils/memberLabelsMr");
-const MemberMonthlyBill = require("../models/MemberMonthlyBill");
-const {
-  upsertMemberMonthlyBill,
-  normalizeMonthStartLocal,
-} = require("../utils/memberMonthlyBillCache");
 
 const router = express.Router();
 const {
@@ -25,6 +20,12 @@ const {
   requireMember,
   ensureSelfParam,
 } = require("../middleware/authMiddleware");
+
+function normalizeMonthStartLocal(monthDate) {
+  const d = monthDate instanceof Date ? monthDate : new Date(monthDate);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+}
 
 async function getNextMemberRollNumber() {
   const countersKey = "memberRollNumber";
@@ -136,8 +137,8 @@ router.get("/", authenticate, requireAdmin, async (req, res) => {
           const key = monthKeyLocal(monthDate);
           if (!key) continue;
 
-          // Always recompute/upsert so due stays correct even if billing rules change.
-          const doc = await upsertMemberMonthlyBill(memberId, monthDate);
+          // Recompute from source data.
+          const doc = await calculateMemberBilling(memberId, monthDate);
           totalBillsSum += Number(doc?.totalBill || 0);
           const remaining = Number(doc?.remainingAmount || 0);
           dueTotal += remaining;
@@ -233,42 +234,34 @@ router.get(
         .select("_id")
         .lean();
 
-      // Avoid recomputing if we already have a cached row for this month.
-      const existingDocs = await MemberMonthlyBill.find({ month: monthStart })
-        .select("memberId")
-        .lean();
-      const existingSet = new Set((existingDocs || []).map((d) => String(d.memberId)));
+      const members = await Promise.all(
+        (membersToCompute || []).map(async (m) => {
+          const memberDoc = await Member.findById(m._id)
+            .select(
+              "name nameMr rollNumber roomOwnerName roomOwnerNameMr status statusMr mealPlan mealPlanMr joiningDate"
+            )
+            .lean();
+          const billing = await calculateMemberBilling(m._id, monthStart);
 
-      for (const mm of membersToCompute) {
-        const mid = String(mm._id);
-        if (existingSet.has(mid)) continue;
-        await upsertMemberMonthlyBill(mm._id, monthStart);
-      }
-
-      const dueDocs = await MemberMonthlyBill.find({ month: monthStart })
-        .populate(
-          "memberId",
-          "name nameMr rollNumber roomOwnerName roomOwnerNameMr status statusMr mealPlan mealPlanMr joiningDate"
-        )
-        .lean();
-
-      const members = (dueDocs || []).map((d) => ({
-        memberId: d.memberId?._id || d.memberId,
-        name: d.memberId?.name || "",
-        nameMr: d.memberId?.nameMr || "",
-        rollNumber: d.memberId?.rollNumber || "",
-        roomOwnerName: d.memberId?.roomOwnerName || "",
-        roomOwnerNameMr: d.memberId?.roomOwnerNameMr || "",
-        status: d.memberId?.status || "",
-        statusMr: d.memberId?.statusMr || "",
-        mealPlan: d.memberId?.mealPlan || "",
-        mealPlanMr: d.memberId?.mealPlanMr || "",
-        joiningDate: d.memberId?.joiningDate || null,
-        dueAmount: Number(d.remainingAmount || 0),
-        paidAmount: Number(d.paidAmount || 0),
-        remainingAmount: Number(d.remainingAmount || 0),
-        monthlyStatus: d.status || "Pending",
-      }));
+          return {
+            memberId: memberDoc?._id || m._id,
+            name: memberDoc?.name || "",
+            nameMr: memberDoc?.nameMr || "",
+            rollNumber: memberDoc?.rollNumber || "",
+            roomOwnerName: memberDoc?.roomOwnerName || "",
+            roomOwnerNameMr: memberDoc?.roomOwnerNameMr || "",
+            status: memberDoc?.status || "",
+            statusMr: memberDoc?.statusMr || "",
+            mealPlan: memberDoc?.mealPlan || "",
+            mealPlanMr: memberDoc?.mealPlanMr || "",
+            joiningDate: memberDoc?.joiningDate || null,
+            dueAmount: Number(billing?.remainingAmount || 0),
+            paidAmount: Number(billing?.paidAmount || 0),
+            remainingAmount: Number(billing?.remainingAmount || 0),
+            monthlyStatus: billing?.status || "Pending",
+          };
+        })
+      );
 
       const totals = (members || []).reduce(
         (acc, m) => {
@@ -346,8 +339,8 @@ router.get(
       for (const monthDate of monthStarts) {
         const key = monthKeyLocal(monthDate);
         if (!key) continue;
-        // Always recompute/upsert so due stays correct even if billing rules change.
-        const doc = await upsertMemberMonthlyBill(id, monthDate);
+        // Recompute from source data.
+        const doc = await calculateMemberBilling(id, monthDate);
         const billDoc = doc
           ? {
               month: doc.month,
@@ -440,23 +433,6 @@ router.get(
         return `${d.getFullYear()}-${d.getMonth()}`;
       };
 
-      const cached = await MemberMonthlyBill.find({
-        memberId: id,
-        month: { $in: monthsToInclude },
-      })
-        .select("month remainingAmount")
-        .lean();
-
-      const remainingByKey = new Map(
-        (cached || [])
-          .map((r) => {
-            const key = monthKeyLocal(normalizeMonthStartLocal(r.month));
-            if (!key) return null;
-            return [key, Number(r.remainingAmount || 0)];
-          })
-          .filter(Boolean)
-      );
-
       let dueBeforePayment = 0;
       let remainingForMonth = 0;
 
@@ -464,14 +440,8 @@ router.get(
         const key = monthKeyLocal(monthStart);
         if (!key) continue;
 
-        let remaining = 0;
-        if (remainingByKey.has(key)) {
-          remaining = Number(remainingByKey.get(key) || 0);
-        } else {
-          const doc = await upsertMemberMonthlyBill(id, monthStart);
-          remaining = Number(doc?.remainingAmount || 0);
-          remainingByKey.set(key, remaining);
-        }
+        const doc = await calculateMemberBilling(id, monthStart);
+        const remaining = Number(doc?.remainingAmount || 0);
 
         dueBeforePayment += remaining;
         if (monthKeyLocal(targetMonthStart) === key) remainingForMonth = remaining;

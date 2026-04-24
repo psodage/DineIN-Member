@@ -6,8 +6,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 import { fetchActivePoll, voteForPoll } from "../../@poll.js";
+
+const PRIMARY = "#0F8F88";
+const TEXT_DARK = "#0F172A";
+const TEXT_MUTE = "#64748B";
 
 function isErrorMessage(err) {
   return typeof err === "string" && err.trim().length > 0;
@@ -17,7 +22,11 @@ export default function MemberPollCard({ date = new Date() }) {
   const dateKey = useMemo(() => {
     try {
       const d = date instanceof Date ? date : new Date(date);
-      return d.toISOString().slice(0, 10);
+      if (Number.isNaN(d.getTime())) return "";
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
     } catch {
       return String(date ?? "");
     }
@@ -40,12 +49,8 @@ export default function MemberPollCard({ date = new Date() }) {
       setErrorText("");
       setSuccessText("");
       try {
-        // Use the stable YYYY-MM-DD key so we don't refetch just because
-        // `date` object identity changed between renders.
-        const dateForQuery = dateKey
-          ? new Date(`${dateKey}T12:00:00Z`)
-          : new Date();
-        const active = await fetchActivePoll({ date: dateForQuery });
+        // Use local YYYY-MM-DD key directly to avoid timezone shifts.
+        const active = await fetchActivePoll({ date: dateKey || undefined });
         if (!mounted) return;
         setPoll(active);
         setSelectedOptionKey(active?.myVote ?? null);
@@ -116,13 +121,9 @@ export default function MemberPollCard({ date = new Date() }) {
 
   return (
     <View style={styles.card}>
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>Poll</Text>
-      </View>
-
       {loading ? (
         <View style={styles.stateWrap}>
-          <ActivityIndicator color="#F97316" />
+          <ActivityIndicator color={PRIMARY} />
           <Text style={styles.mutedText}>Loading poll…</Text>
         </View>
       ) : poll ? (
@@ -147,6 +148,17 @@ export default function MemberPollCard({ date = new Date() }) {
                   ]}
                 >
                   <View style={styles.optionRow}>
+                    <View
+                      style={[
+                        styles.optionIndicator,
+                        selected && styles.optionIndicatorSelected,
+                        hasVoted && !selected && styles.optionIndicatorDisabled,
+                      ]}
+                    >
+                      {selected ? (
+                        <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                      ) : null}
+                    </View>
                     <Text
                       style={[
                         styles.optionLabel,
@@ -160,16 +172,23 @@ export default function MemberPollCard({ date = new Date() }) {
                     </Text>
 
                     {hasVoted && count !== null && (
-                      <Text
+                      <View
                         style={[
-                          styles.optionCountText,
-                          selected
-                            ? styles.optionCountTextSelected
-                            : styles.optionCountTextDisabled,
+                          styles.countPill,
+                          selected ? styles.countPillSelected : styles.countPillMuted,
                         ]}
                       >
-                        {count}
-                      </Text>
+                        <Text
+                          style={[
+                            styles.optionCountText,
+                            selected
+                              ? styles.optionCountTextSelected
+                              : styles.optionCountTextDisabled,
+                          ]}
+                        >
+                          {count}
+                        </Text>
+                      </View>
                     )}
                   </View>
                 </TouchableOpacity>
@@ -188,7 +207,14 @@ export default function MemberPollCard({ date = new Date() }) {
                 disabled={!canVote}
                 style={[styles.voteButton, !canVote && styles.voteButtonDisabled]}
               >
-                <Text style={styles.voteButtonText}>Vote</Text>
+                {submitting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <View style={styles.voteButtonContent}>
+                    <Text style={styles.voteButtonText}>Submit</Text>
+                    <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
+                  </View>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -204,7 +230,13 @@ export default function MemberPollCard({ date = new Date() }) {
         </>
       ) : (
         <View style={styles.emptyWrap}>
+          <View style={styles.pollIllustration}>
+            <Ionicons name="bar-chart-outline" size={34} color={PRIMARY} />
+          </View>
           <Text style={styles.emptyText}>No active polls available</Text>
+          <Text style={styles.emptySubText}>
+            Check back later for new polls and give your opinion!
+          </Text>
         </View>
       )}
     </View>
@@ -213,31 +245,10 @@ export default function MemberPollCard({ date = new Date() }) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 0,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+    paddingTop: 6,
   },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 6,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "900",
-    color: "#111827",
-  },
-
   mutedText: {
-    color: "#6B7280",
+    color: TEXT_MUTE,
     fontSize: 13,
     fontWeight: "700",
     marginTop: 8,
@@ -246,8 +257,8 @@ const styles = StyleSheet.create({
 
   questionText: {
     fontSize: 14,
-    fontWeight: "700",
-    color: "#6B7280",
+    fontWeight: "800",
+    color: TEXT_MUTE,
     marginTop: 10,
     marginBottom: 14,
   },
@@ -257,17 +268,24 @@ const styles = StyleSheet.create({
   },
 
   optionBox: {
-    backgroundColor: "#F3F4F6",
-    borderRadius: 0,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "#E2E8F0",
     paddingVertical: 12,
     paddingHorizontal: 12,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
 
   optionBoxSelected: {
-    backgroundColor: "#ECFDF5",
-    borderColor: "#10B981",
+    backgroundColor: "#E8F8F6",
+    borderColor: PRIMARY,
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.12,
   },
 
   optionBoxDisabled: {
@@ -277,22 +295,62 @@ const styles = StyleSheet.create({
   optionLabel: {
     fontSize: 14,
     fontWeight: "800",
-    color: "#111827",
+    color: TEXT_DARK,
+    flex: 1,
   },
 
   optionLabelSelected: {
-    color: "#047857",
+    color: TEXT_DARK,
   },
 
   optionLabelDisabled: {
-    color: "#6B7280",
+    color: TEXT_MUTE,
   },
 
   optionRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
+    gap: 10,
+  },
+
+  optionIndicator: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  optionIndicatorSelected: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+  },
+
+  optionIndicatorDisabled: {
+    opacity: 0.75,
+  },
+
+  countPill: {
+    minWidth: 36,
+    height: 26,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  countPillSelected: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#BFEDEA",
+  },
+
+  countPillMuted: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
   },
 
   optionCountText: {
@@ -301,11 +359,11 @@ const styles = StyleSheet.create({
   },
 
   optionCountTextSelected: {
-    color: "#047857",
+    color: PRIMARY,
   },
 
   optionCountTextDisabled: {
-    color: "#6B7280",
+    color: TEXT_MUTE,
   },
 
   stateWrap: {
@@ -338,16 +396,28 @@ const styles = StyleSheet.create({
 
   voteButton: {
     flex: 1,
-    height: 46,
-    backgroundColor: "#F97316",
-    borderRadius: 0,
+    minHeight: 46,
+    backgroundColor: PRIMARY,
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 16,
+    shadowColor: PRIMARY,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 5,
   },
 
   voteButtonDisabled: {
-    backgroundColor: "#FDBA74",
-    opacity: 0.95,
+    opacity: 0.55,
+  },
+
+  voteButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
   },
 
   voteButtonText: {
@@ -357,11 +427,11 @@ const styles = StyleSheet.create({
   },
 
   cancelButton: {
-    height: 46,
-    borderRadius: 0,
+    minHeight: 46,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#F3F4F6",
+    borderColor: "#E2E8F0",
+    backgroundColor: "#FFFFFF",
     paddingHorizontal: 16,
     alignItems: "center",
     justifyContent: "center",
@@ -369,19 +439,41 @@ const styles = StyleSheet.create({
 
   cancelButtonText: {
     fontSize: 15,
-    fontWeight: "900",
-    color: "#374151",
+    fontWeight: "800",
+    color: TEXT_DARK,
   },
 
   emptyWrap: {
-    paddingVertical: 18,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#FAFCFC",
+    paddingVertical: 20,
+    paddingHorizontal: 14,
     alignItems: "center",
+  },
+  pollIllustration: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#E8F8F6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
   },
 
   emptyText: {
-    color: "#6B7280",
-    fontSize: 14,
-    fontWeight: "800",
+    color: TEXT_DARK,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  emptySubText: {
+    marginTop: 8,
+    color: TEXT_MUTE,
+    textAlign: "center",
+    lineHeight: 19,
+    fontSize: 13,
+    paddingHorizontal: 8,
   },
 });
 

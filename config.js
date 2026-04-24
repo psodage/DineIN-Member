@@ -41,6 +41,24 @@ function replaceLoopbackWithLan(base) {
   }
 }
 
+function isPrivateIpv4(hostname) {
+  return /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(String(hostname || ""));
+}
+
+function replacePrivateIpWithLan(base) {
+  const lan = inferLanHost();
+  if (!lan) return base;
+  try {
+    const withProtocol = base.includes("://") ? base : `http://${base}`;
+    const u = new URL(withProtocol);
+    if (!isPrivateIpv4(u.hostname) || u.hostname === lan) return base;
+    const port = u.port || String(DEFAULT_PORT);
+    return `${u.protocol}//${lan}:${port}`;
+  } catch {
+    return base;
+  }
+}
+
 // Set in .env — do NOT include "/api"; clients use `${API_BASE_URL}/api/...`
 const explicitRaw = process.env.EXPO_PUBLIC_API_BASE_URL;
 
@@ -62,6 +80,9 @@ export const API_BASE_URL = (() => {
       const u = new URL(withProtocol);
       if (isLoopbackHostname(u.hostname)) {
         base = normalizeBase(replaceLoopbackWithLan(withProtocol));
+      } else if (__DEV__ && isPrivateIpv4(u.hostname)) {
+        // In dev, a stale hardcoded LAN IP in .env can break API calls after network changes.
+        base = normalizeBase(replacePrivateIpWithLan(withProtocol));
       }
     } catch {
       // keep base as-is

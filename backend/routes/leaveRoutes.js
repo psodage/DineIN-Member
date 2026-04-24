@@ -35,6 +35,22 @@ function formatYMDLocal(d) {
   return `${y}-${m}-${day}`;
 }
 
+function parseMonthQuery(monthStr) {
+  const raw = String(monthStr || "").trim();
+  if (!raw) return getMonthStart(new Date());
+  const m = raw.match(/^(\d{4})-(\d{2})$/);
+  if (m) {
+    const year = Number(m[1]);
+    const monthIndex = Number(m[2]) - 1;
+    if (Number.isFinite(year) && Number.isFinite(monthIndex)) {
+      return new Date(year, monthIndex, 1);
+    }
+  }
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return getMonthStart(new Date());
+  return getMonthStart(d);
+}
+
 /** Expand inclusive [start, end] into YYYY-MM-DD strings intersecting [rangeStart, rangeEnd]. */
 function collectLeaveDaysInRange(start, end, rangeStart, rangeEnd) {
   const out = new Set();
@@ -67,6 +83,79 @@ function collectLeaveDaysInRange(start, end, rangeStart, rangeEnd) {
  * GET /api/leave/stat/:memberId/current
  * Returns LeaveStat for current month (inactiveDays + totalMessBill).
  */
+router.get(
+  "/self/:memberId/month",
+  authenticate,
+  requireMember,
+  ensureSelfParam("memberId"),
+  async (req, res) => {
+    try {
+      const { memberId } = req.params;
+      const monthStart = parseMonthQuery(req.query?.month);
+      const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+
+      const monthLeaves = await LeaveRequest.find({
+        memberId,
+        type: "Leave",
+        startDate: { $lte: monthEnd },
+        endDate: { $gte: monthStart },
+      })
+        .select("startDate endDate status reason reasonMr createdAt")
+        .sort({ startDate: 1, createdAt: -1 })
+        .lean();
+
+      const approvedSet = new Set();
+      let pendingCount = 0;
+
+      for (const leave of monthLeaves) {
+        const status = String(leave?.status || "").toLowerCase();
+        if (status === "pending") pendingCount += 1;
+        if (status !== "approved") continue;
+        const s = parseDate(leave.startDate);
+        const e = parseDate(leave.endDate);
+        if (!s || !e) continue;
+        const days = collectLeaveDaysInRange(s, e, monthStart, monthEnd);
+        days.forEach((d) => approvedSet.add(d));
+      }
+
+      return res.json({
+        memberId,
+        month: monthStart,
+        monthKey: `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, "0")}`,
+        approvedLeaveDates: Array.from(approvedSet).sort(),
+        approvedLeaveCount: approvedSet.size,
+        pendingRequestCount: pendingCount,
+        requests: monthLeaves,
+      });
+    } catch (error) {
+      console.error("Get member month leaves error:", error);
+      return res.status(500).json({ message: "Failed to fetch month leaves" });
+    }
+  }
+);
+
+router.get(
+  "/self/:memberId/history",
+  authenticate,
+  requireMember,
+  ensureSelfParam("memberId"),
+  async (req, res) => {
+    try {
+      const { memberId } = req.params;
+      const limit = Math.max(1, Math.min(200, Number(req.query?.limit || 100)));
+      const rows = await LeaveRequest.find({ memberId, type: "Leave" })
+        .select("startDate endDate status reason reasonMr createdAt updatedAt")
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .lean();
+      return res.json(rows);
+    } catch (error) {
+      console.error("Get member leave history error:", error);
+      return res.status(500).json({ message: "Failed to fetch leave history" });
+    }
+  }
+);
+
 router.get(
   "/stat/:memberId/current",
   authenticate,

@@ -2,7 +2,6 @@ const Member = require("../models/Member");
 const MonthlyBillEmailLog = require("../models/MonthlyBillEmailLog");
 const { sendMonthlyBillEmail } = require("../utils/email");
 const { calculateMemberBilling } = require("../utils/billing");
-const { upsertMemberMonthlyBill } = require("../utils/memberMonthlyBillCache");
 
 function monthKeyFromDate(d) {
   const year = d.getFullYear();
@@ -59,9 +58,6 @@ async function runMonthlyBillEmailJob(now = new Date()) {
       const total = Number(billing?.totalBill || 0);
       const paid = Number(billing?.paidAmount || 0);
       const due = Number(billing?.remainingAmount || 0);
-
-      // Keep monthly billing cache updated for fast due display.
-      await upsertMemberMonthlyBill(m._id, prev);
 
       await sendMonthlyBillEmail({
         to: m.userId?.email,

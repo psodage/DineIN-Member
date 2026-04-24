@@ -1,7 +1,6 @@
 const express = require("express");
 const Payment = require("../models/Payment");
 const { calculateMemberBilling } = require("../utils/billing");
-const { upsertMemberMonthlyBill } = require("../utils/memberMonthlyBillCache");
 const {
   authenticate,
   requireMember,
@@ -161,9 +160,6 @@ router.post("/", async (req, res) => {
       date: paymentDate,
     });
 
-    // Update monthly billing cache so due totals reflect this payment.
-    await upsertMemberMonthlyBill(member, monthDate);
-
     await payment.populate("memberId", "name rollNumber roomOwnerName");
     res.status(201).json(payment);
   } catch (error) {
@@ -214,11 +210,6 @@ router.put("/:id", async (req, res) => {
     }
     await payment.save();
 
-    // Update monthly billing cache so due totals reflect this update.
-    if (payment?.memberId && payment?.month) {
-      await upsertMemberMonthlyBill(payment.memberId, payment.month);
-    }
-
     await payment.populate("memberId", "name rollNumber roomOwnerName");
     res.json(payment);
   } catch (error) {
@@ -233,11 +224,6 @@ router.delete("/:id", async (req, res) => {
     const payment = await Payment.findByIdAndDelete(req.params.id);
     if (!payment) {
       return res.status(404).json({ message: "Payment not found" });
-    }
-
-    // Update monthly billing cache so due totals reflect this deletion.
-    if (payment?.memberId && payment?.month) {
-      await upsertMemberMonthlyBill(payment.memberId, payment.month);
     }
 
     res.json({ message: "Payment deleted" });

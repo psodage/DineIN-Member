@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
 } from "react-native";
@@ -21,6 +22,7 @@ import { useAuth } from "../../lib/AuthContext";
 import { useLanguage } from "../../LanguageContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import FullScreenLoading from "../../components/FullScreenLoading";
 
 const PRIMARY = "#F97316";
 const INPUT_BG = "#F5F5F5";
@@ -35,13 +37,33 @@ export default function MemberLoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [isMessageModalVisible, setIsMessageModalVisible] = useState(false);
+  const [messageTitle, setMessageTitle] = useState("");
+  const [messageBody, setMessageBody] = useState("");
+  const [messageType, setMessageType] = useState("error");
+  const [messageAction, setMessageAction] = useState(null);
+
+  const showMessageModal = (title, body, type = "error", onClose = null) => {
+    setMessageTitle(title || "");
+    setMessageBody(body || "");
+    setMessageType(type);
+    setMessageAction(() => onClose);
+    setIsMessageModalVisible(true);
+  };
+
+  const closeMessageModal = () => {
+    setIsMessageModalVisible(false);
+    const action = messageAction;
+    setMessageAction(null);
+    if (typeof action === "function") action();
+  };
 
   const handleLogin = async () => {
     const cleanEmail = String(email ?? "").trim();
     const cleanPassword = String(password ?? "").trim();
 
     if (!cleanEmail) {
-      Alert.alert(
+      showMessageModal(
         t("alert_error"),
         t("member_login_missing_fields") || "Please enter email and password"
       );
@@ -49,7 +71,7 @@ export default function MemberLoginScreen() {
     }
 
     if (!cleanPassword) {
-      Alert.alert(
+      showMessageModal(
         t("alert_error"),
         t("member_login_missing_password") || "Please enter password"
       );
@@ -65,14 +87,18 @@ export default function MemberLoginScreen() {
       });
 
       await login(res.data.token, res.data.user, { remember: rememberMe });
-      Alert.alert(t("alert_success"), t("login_success"));
-      setTimeout(() => router.replace("/Member/MemberDashboard"), 0);
+      showMessageModal(
+        t("alert_success"),
+        t("login_success"),
+        "success",
+        () => router.replace("/Member/MemberDashboard")
+      );
     } catch (err) {
       const msg =
         err?.response?.data?.message ||
         t("member_login_failed_generic") ||
         t("login_failed_generic");
-      Alert.alert(t("alert_error"), msg);
+      showMessageModal(t("alert_error"), msg);
     } finally {
       setLoading(false);
     }
@@ -222,11 +248,7 @@ export default function MemberLoginScreen() {
               onPress={handleLogin}
               activeOpacity={0.9}
             >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.primaryButtonText}>{t("login_title")}</Text>
-              )}
+              <Text style={styles.primaryButtonText}>{t("login_title")}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -248,6 +270,33 @@ export default function MemberLoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <FullScreenLoading visible={loading} color={PRIMARY} />
+      <Modal
+        transparent
+        animationType="fade"
+        visible={isMessageModalVisible}
+        onRequestClose={closeMessageModal}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{messageTitle}</Text>
+            <Text style={styles.modalBody}>{messageBody}</Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[
+                  styles.modalBtn,
+                  messageType === "success" ? styles.modalBtnSuccess : styles.modalBtnError,
+                ]}
+                activeOpacity={0.88}
+                onPress={closeMessageModal}
+              >
+                <Text style={styles.modalBtnText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -427,5 +476,52 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     color: "#111827",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 380,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    padding: 14,
+  },
+  modalTitle: {
+    color: "#0F172A",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  modalBody: {
+    marginTop: 6,
+    color: "#64748B",
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 19,
+  },
+  modalActions: {
+    marginTop: 12,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
+  modalBtn: {
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+  },
+  modalBtnSuccess: {
+    backgroundColor: "#16A34A",
+  },
+  modalBtnError: {
+    backgroundColor: PRIMARY,
+  },
+  modalBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
   },
 });

@@ -14,6 +14,7 @@ import { useRouter } from "expo-router";
 import { API_BASE_URL } from "../../config";
 import { useLanguage } from "../../LanguageContext";
 import LanguageToggle from "../../components/LanguageToggle";
+import FullScreenLoading from "../../components/FullScreenLoading";
 
 export default function MemberForgotPasswordScreen() {
   const router = useRouter();
@@ -95,12 +96,10 @@ export default function MemberForgotPasswordScreen() {
       />
 
       <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-        {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.buttonText}>{t("forgot_button")}</Text>
-        )}
+        <Text style={styles.buttonText}>{t("forgot_button")}</Text>
       </TouchableOpacity>
+
+      <FullScreenLoading visible={loading} color="#000000" />
     </View>
   );
 }

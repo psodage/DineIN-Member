@@ -14,6 +14,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import api from "../../lib/api";
 import { useAuth } from "../../lib/AuthContext";
 import { useLanguage } from "../../LanguageContext";
+import FullScreenLoading from "../../components/FullScreenLoading";
 
 const GREEN = "#4CAF50";
 const RED = "#F44336";
@@ -253,9 +254,7 @@ export default function MemberActivityCalendar() {
   if (authLoading || !isAuthenticated) {
     return (
       <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#111827" />
-        </View>
+        <FullScreenLoading visible color="#111827" />
       </View>
     );
   }
@@ -328,57 +327,53 @@ export default function MemberActivityCalendar() {
         </Text>
       </View>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#111827" />
-        </View>
-      ) : (
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.calendarWrap}>
-            <View style={styles.weekRow}>
-              {weekDays.map((w) => (
-                <Text key={w} style={styles.weekdayLabel}>
-                  {w}
-                </Text>
-              ))}
-            </View>
-            {rows.map((row, ri) => (
-              <View key={`row-${ri}`} style={styles.gridRow}>
-                {row.map((item) => {
-                  if (item.type === "empty") {
-                    return (
-                      <View key={item.key} style={styles.cell}>
-                        <View style={styles.cellInnerEmpty} />
-                      </View>
-                    );
-                  }
-
-                  const isBeforeJoin = isBeforeDate(item.date, joiningDateObj);
-                  const ymd = formatYMD(item.date);
-                  let bg = GREEN;
-                  if (isBeforeJoin || isFutureDate(item.date)) bg = GREY;
-                  else if (leaveKeys.has(ymd)) bg = RED;
-
-                  const isGrey = bg === GREY;
-                  return (
-                    <View key={item.key} style={styles.cell}>
-                      <View style={[styles.cellInner, { backgroundColor: bg }]}>
-                        <Text style={[styles.cellText, isGrey && styles.cellTextFuture]}>
-                          {item.date.getDate()}
-                        </Text>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.calendarWrap}>
+          <View style={styles.weekRow}>
+            {weekDays.map((w) => (
+              <Text key={w} style={styles.weekdayLabel}>
+                {w}
+              </Text>
             ))}
           </View>
-        </ScrollView>
-      )}
+          {rows.map((row, ri) => (
+            <View key={`row-${ri}`} style={styles.gridRow}>
+              {row.map((item) => {
+                if (item.type === "empty") {
+                  return (
+                    <View key={item.key} style={styles.cell}>
+                      <View style={styles.cellInnerEmpty} />
+                    </View>
+                  );
+                }
+
+                const isBeforeJoin = isBeforeDate(item.date, joiningDateObj);
+                const ymd = formatYMD(item.date);
+                let bg = GREEN;
+                if (isBeforeJoin || isFutureDate(item.date)) bg = GREY;
+                else if (leaveKeys.has(ymd)) bg = RED;
+
+                const isGrey = bg === GREY;
+                return (
+                  <View key={item.key} style={styles.cell}>
+                    <View style={[styles.cellInner, { backgroundColor: bg }]}>
+                      <Text style={[styles.cellText, isGrey && styles.cellTextFuture]}>
+                        {item.date.getDate()}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+
+      <FullScreenLoading visible={loading} color="#111827" />
     </SafeAreaView>
   );
 }
@@ -393,11 +388,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F3F4F6",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
   },
   header: {
     flexDirection: "row",

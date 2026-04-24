@@ -7,6 +7,7 @@ import {
 import { useRouter } from "expo-router";
 import { useAuth } from "../lib/AuthContext";
 import LanguageToggle from "../components/LanguageToggle";
+import FullScreenLoading from "../components/FullScreenLoading";
 
 export default function Index() {
   const router = useRouter();
@@ -34,7 +35,7 @@ export default function Index() {
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#111827" />
+        <FullScreenLoading visible color="#111827" />
       </View>
     );
   }
@@ -46,7 +47,7 @@ export default function Index() {
   return (
     <View style={styles.loading}>
       <LanguageToggle />
-      <ActivityIndicator size="large" color="#111827" />
+      <FullScreenLoading visible color="#111827" />
     </View>
   );
 }

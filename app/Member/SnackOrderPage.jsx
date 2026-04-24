@@ -8,12 +8,14 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "../../lib/api";
+import FullScreenLoading from "../../components/FullScreenLoading";
 
 const SnackOrderPage = ({ embedded = false }) => {
   const router = useRouter();
@@ -22,9 +24,12 @@ const SnackOrderPage = ({ embedded = false }) => {
   const [memberName, setMemberName] = useState("");
   const [snacks, setSnacks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const placingOrderRef = useRef(false);
   const [quantities, setQuantities] = useState({});
+
+  const getSnackKey = (snack) => String(snack?._id || snack?.id || "");
 
   const getSnackStock = (snack) => {
     // `SnackProduct.quantity` is stock/available units.
@@ -43,36 +48,36 @@ const SnackOrderPage = ({ embedded = false }) => {
     return String(Math.max(0, stock));
   };
 
-  useEffect(() => {
-    const loadStudentId = async () => {
-      try {
-        const storedUser = await AsyncStorage.getItem("user");
-        if (storedUser) {
-          const parsed = JSON.parse(storedUser);
-          const id = parsed?._id || parsed?.id || parsed?.memberId;
-          if (id) {
-            setStudentId(String(id));
-          }
-          const name =
-            parsed?.name ||
-            parsed?.fullName ||
-            parsed?.studentName ||
-            parsed?.email;
-          if (name) {
-            setMemberName(String(name));
-          }
-        }
-      } catch (error) {
-        console.error("Failed to load studentId from storage:", error);
+  const loadStudentContext = useCallback(async () => {
+    try {
+      const storedUser = await AsyncStorage.getItem("user");
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        const id = parsed?._id || parsed?.id || parsed?.memberId;
+        setStudentId(id ? String(id) : null);
+        const name =
+          parsed?.name ||
+          parsed?.fullName ||
+          parsed?.studentName ||
+          parsed?.email;
+        setMemberName(name ? String(name) : "");
+      } else {
+        setStudentId(null);
+        setMemberName("");
       }
-    };
-
-    loadStudentId();
+    } catch (error) {
+      console.error("Failed to load studentId from storage:", error);
+    }
   }, []);
 
-  const fetchSnacks = useCallback(async () => {
+  useEffect(() => {
+    loadStudentContext();
+  }, [loadStudentContext]);
+
+  const fetchSnacks = useCallback(async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
       const res = await api.get("/api/snack-products", {
         params: { available: "true" },
       });
@@ -92,12 +97,26 @@ const SnackOrderPage = ({ embedded = false }) => {
       setSnacks([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
     fetchSnacks();
   }, [fetchSnacks]);
+
+  const refreshPage = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      // Full-page refresh should reload session-bound member context
+      // and latest snack inventory, then reset transient cart UI state.
+      await loadStudentContext();
+      await fetchSnacks(true);
+      setQuantities({});
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadStudentContext, fetchSnacks]);
 
   const getQuantity = (id) => {
     const key = String(id);
@@ -122,10 +141,13 @@ const SnackOrderPage = ({ embedded = false }) => {
   const visibleSnacks = snacks.filter(
     (s) => s.availability !== false && getSnackStock(s) >= 1
   );
-  const cartItems = visibleSnacks.filter((s) => getQuantity(s._id) > 0);
-  const totalItems = cartItems.reduce((sum, s) => sum + getQuantity(s._id), 0);
+  const cartItems = visibleSnacks.filter((s) => getQuantity(getSnackKey(s)) > 0);
+  const totalItems = cartItems.reduce(
+    (sum, s) => sum + getQuantity(getSnackKey(s)),
+    0
+  );
   const cartTotal = cartItems.reduce(
-    (sum, s) => sum + Number(s.price || 0) * getQuantity(s._id),
+    (sum, s) => sum + Number(s.price || 0) * getQuantity(getSnackKey(s)),
     0
   );
 
@@ -142,10 +164,11 @@ const SnackOrderPage = ({ embedded = false }) => {
 
     const orderPayload = snacks
       .map((s) => {
-        const quantity = getQuantity(s._id);
+        const snackKey = getSnackKey(s);
+        const quantity = getQuantity(snackKey);
         const stock = getSnackStock(s);
         return {
-          snackId: s._id,
+          snackId: snackKey,
           quantity,
           _stock: stock,
         };
@@ -232,7 +255,8 @@ const SnackOrderPage = ({ embedded = false }) => {
   };
 
   const renderSnackCard = ({ item }) => {
-    const quantity = getQuantity(item._id);
+    const snackKey = getSnackKey(item);
+    const quantity = getQuantity(snackKey);
     const price = Number(item.price || 0);
     const maxStock = getSnackStock(item);
     const canIncrease =
@@ -266,7 +290,7 @@ const SnackOrderPage = ({ embedded = false }) => {
               <View style={styles.qtyPill}>
                 <TouchableOpacity
                   style={styles.qtyCircleButton}
-                  onPress={() => updateQuantity(item._id, -1)}
+                  onPress={() => updateQuantity(snackKey, -1)}
                   activeOpacity={0.75}
                 >
                   <Ionicons name="remove" size={16} color="#475569" />
@@ -293,7 +317,7 @@ const SnackOrderPage = ({ embedded = false }) => {
                   ]}
                   onPress={() => {
                     if (!canIncrease) return;
-                    updateQuantity(item._id, 1);
+                    updateQuantity(snackKey, 1);
                   }}
                   activeOpacity={0.75}
                   disabled={!canIncrease}
@@ -372,31 +396,33 @@ const SnackOrderPage = ({ embedded = false }) => {
       </View>
 
       <View style={styles.mainPanel}>
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#0F8F88" />
-          </View>
-        ) : (
-          <FlatList
-            data={visibleSnacks}
-            keyExtractor={(item) => String(item._id)}
-            renderItem={renderSnackCard}
-            extraData={quantities}
-            contentContainerStyle={[
-              styles.listContent,
-              totalItems > 0 && { paddingBottom: 220 },
-            ]}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Ionicons name="fast-food-outline" size={60} color="#CBD5E1" />
-                <Text style={styles.emptyText}>No snacks available right now.</Text>
-              </View>
-            }
-        
-          />
-        )}
+        <FlatList
+          data={visibleSnacks}
+          keyExtractor={(item) => getSnackKey(item) || String(Math.random())}
+          renderItem={renderSnackCard}
+          extraData={quantities}
+          contentContainerStyle={[
+            styles.listContent,
+            totalItems > 0 && { paddingBottom: 220 },
+          ]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={refreshPage}
+              tintColor="#0F8F88"
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="fast-food-outline" size={60} color="#CBD5E1" />
+              <Text style={styles.emptyText}>No snacks available right now.</Text>
+            </View>
+          }
+        />
       </View>
+
+      <FullScreenLoading visible={loading && !refreshing} color="#0F8F88" />
 
       {totalItems > 0 && (
         <View style={[styles.floatingCart, embedded && styles.floatingCartEmbedded]}>
@@ -603,21 +629,21 @@ const styles = StyleSheet.create({
     color: "#0F8F88",
   },
   qtyPill: {
-    height: 34,
-    minWidth: 102,
+    height: 42,
+    minWidth: 132,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "#E2E8F0",
     backgroundColor: "#F8FAFC",
-    paddingHorizontal: 3,
+    paddingHorizontal: 6,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   qtyCircleButton: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#FFFFFF",
@@ -628,9 +654,9 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   qtyValueWrap: {
-    minWidth: 28,
-    height: 26,
-    borderRadius: 13,
+    minWidth: 46,
+    height: 34,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -639,9 +665,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   qtyValue: {
-    fontSize: 14,
-    lineHeight: 17,
-    fontWeight: "700",
+    fontSize: 18,
+    lineHeight: 20,
+    fontWeight: "800",
     color: "#0F172A",
   },
   qtyValueActive: {

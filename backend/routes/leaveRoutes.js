@@ -12,6 +12,7 @@ const {
   ensureSelfParam,
   ensureSelfBody,
 } = require("../middleware/authMiddleware");
+const { getLeaveStreakRequiredDays } = require("../utils/appSettings");
 
 const router = express.Router();
 
@@ -118,6 +119,8 @@ router.get(
         days.forEach((d) => approvedSet.add(d));
       }
 
+      const leaveStreakRequiredDays = await getLeaveStreakRequiredDays();
+
       return res.json({
         memberId,
         month: monthStart,
@@ -126,6 +129,7 @@ router.get(
         approvedLeaveCount: approvedSet.size,
         pendingRequestCount: pendingCount,
         requests: monthLeaves,
+        leaveStreakRequiredDays,
       });
     } catch (error) {
       console.error("Get member month leaves error:", error);
@@ -327,10 +331,10 @@ router.post(
  * Member taps "apply leave" once for TODAY.
  *
  * Business rule:
- * - Only streaks of >= 5 consecutive leave days in a month affect billing.
- * - When a streak reaches 5 days, all 5 days are counted into inactiveDays
+ * - Only streaks of >= required consecutive leave days in a month affect billing.
+ * - When a streak reaches required days, all streak days are counted into inactiveDays
  *   at once. Further consecutive days (6,7,...) each add 1 more inactive day.
- * - Short streaks (<5 days) are never counted.
+ * - Short streaks (<required streak days) are never counted.
  */
 router.post(
   "/apply-simple",
@@ -385,13 +389,15 @@ router.post(
       streak = 1;
     }
 
-    // Only streaks >= 5 days should contribute to inactiveDays
+    const requiredStreakDays = await getLeaveStreakRequiredDays();
+
+    // Only streaks >= requiredStreakDays should contribute to inactiveDays
     let deltaInactive = 0;
-    if (streak === 5) {
-      // First time we hit 5 consecutive days: count all 5 at once
-      deltaInactive = 5;
-    } else if (streak > 5) {
-      // Day 6,7,... each add one more inactive day
+    if (streak === requiredStreakDays) {
+      // First time we hit required streak: count the full streak at once
+      deltaInactive = requiredStreakDays;
+    } else if (streak > requiredStreakDays) {
+      // After threshold, each next day adds one more inactive day
       deltaInactive = 1;
     }
 
@@ -516,9 +522,10 @@ router.put("/approve/:id", async (req, res) => {
           await member.save();
         }
 
-        // Billing rule: only Leave requests with duration >= 5 days contribute to inactiveDays.
+        // Billing rule: only Leave requests with duration >= configured streak days contribute.
         // Apply billing only once per leave request.
         if (member && !leave.billingApplied) {
+          const requiredStreakDays = await getLeaveStreakRequiredDays();
           const start = new Date(leave.startDate);
           const end = new Date(leave.endDate);
           const startDateOnly = new Date(
@@ -539,7 +546,7 @@ router.put("/approve/:id", async (req, res) => {
 
             leave.billingDaysTotal = totalDays;
 
-            if (totalDays >= 5) {
+            if (totalDays >= requiredStreakDays) {
               const breakdown = [];
 
               // Split across months

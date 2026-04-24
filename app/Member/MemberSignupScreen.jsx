@@ -20,6 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { API_BASE_URL } from "../../config";
 import { useLanguage } from "../../LanguageContext";
+import FullScreenLoading from "../../components/FullScreenLoading";
 
 const PRIMARY = "#F97316";
 const INPUT_BG = "#F5F5F5";
@@ -420,17 +421,15 @@ export default function MemberSignupScreen() {
               accessibilityRole="button"
               accessibilityLabel={strings.cta}
             >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.primaryButtonText}>{strings.cta}</Text>
-              )}
+              <Text style={styles.primaryButtonText}>{strings.cta}</Text>
             </TouchableOpacity>
 
            
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <FullScreenLoading visible={loading} color={PRIMARY} />
     </View>
   );
 }

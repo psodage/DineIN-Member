@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "../../lib/api";
 import { useRouter } from "expo-router";
+import FullScreenLoading from "../../components/FullScreenLoading";
 
 const SnackOrderHistory = () => {
   const router = useRouter();
@@ -353,11 +354,7 @@ const SnackOrderHistory = () => {
       </View>
 
       <View style={styles.mainPanel}>
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#0F8F88" />
-          </View>
-        ) : error ? (
+        {error ? (
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconWrap}>
               <Ionicons name="alert-circle-outline" size={40} color="#F59E0B" />
@@ -401,6 +398,8 @@ const SnackOrderHistory = () => {
           />
         )}
       </View>
+
+      <FullScreenLoading visible={loading} color="#0F8F88" />
     </SafeAreaView>
   );
 };

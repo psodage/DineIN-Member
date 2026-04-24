@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Animated,
   ScrollView,
+  RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -17,6 +18,8 @@ import MemberBill from "./MemberBill";
 import MemberProfile from "./MemberProfile";
 import MemberPollCard from "./MemberPollCard";
 import SnackOrderPage from "./SnackOrderPage";
+import MemberInactiveScreen from "./MemberInactiveScreen";
+import FullScreenLoading from "../../components/FullScreenLoading";
 
 const PRIMARY = "#0F8F88";
 const BG = "#F5F7FA";
@@ -113,6 +116,10 @@ const MemberDashboard = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
+  const memberId = user?.id || user?._id;
+  const [memberStatus, setMemberStatus] = useState(() => String(user?.status || "").trim().toLowerCase());
+  const [memberStatusLoading, setMemberStatusLoading] = useState(true);
+  const isMemberInactive = memberStatus === "inactive";
 
   const memberName = user?.name || "Member";
   const hasUnreadNotifications = Number(user?.notificationCount ?? 0) > 0;
@@ -145,19 +152,42 @@ const MemberDashboard = () => {
   const mealTransitionAnim = useRef(new Animated.Value(1)).current;
 
   const [menuList, setMenuList] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [pollRefreshKey, setPollRefreshKey] = useState(0);
   const lastMenuFetchAtRef = useRef(0);
   const menuFetchInFlightRef = useRef(false);
+
+  const fetchMemberStatus = useCallback(async () => {
+    if (!memberId) {
+      setMemberStatusLoading(false);
+      return;
+    }
+    try {
+      const res = await api.get(`/api/members/${memberId}`);
+      const resolvedStatus = String(res?.data?.status || user?.status || "").trim().toLowerCase();
+      setMemberStatus(resolvedStatus);
+    } catch (err) {
+      console.error("Member status fetch error:", err);
+      setMemberStatus(String(user?.status || "").trim().toLowerCase());
+    } finally {
+      setMemberStatusLoading(false);
+    }
+  }, [memberId, user?.status]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000 * 15);
     return () => clearInterval(id);
   }, []);
 
-  const fetchMenuWithRetry = async (attempt = 0) => {
+  useEffect(() => {
+    fetchMemberStatus();
+  }, [fetchMemberStatus]);
+
+  const fetchMenuWithRetry = async (attempt = 0, force = false) => {
     const nowMs = Date.now();
     const THROTTLE_MS = 10 * 60 * 1000;
     if (menuFetchInFlightRef.current) return;
-    if (nowMs - lastMenuFetchAtRef.current < THROTTLE_MS && attempt === 0) return;
+    if (!force && nowMs - lastMenuFetchAtRef.current < THROTTLE_MS && attempt === 0) return;
 
     menuFetchInFlightRef.current = true;
     lastMenuFetchAtRef.current = nowMs;
@@ -175,7 +205,7 @@ const MemberDashboard = () => {
           : 1000 * Math.pow(2, attempt);
 
         await new Promise((r) => setTimeout(r, delayMs));
-        return fetchMenuWithRetry(attempt + 1);
+        return fetchMenuWithRetry(attempt + 1, force);
       }
 
       console.error("Menu fetch error:", err);
@@ -184,6 +214,30 @@ const MemberDashboard = () => {
       menuFetchInFlightRef.current = false;
     }
   };
+
+  const onRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      await fetchMemberStatus();
+      const freshNow = new Date();
+      const freshDateOnly = new Date(
+        freshNow.getFullYear(),
+        freshNow.getMonth(),
+        freshNow.getDate()
+      );
+      // Full-page refresh resets date selection/window, clears stale menu cache,
+      // and remounts the poll card so all sections reload together.
+      setNow(freshNow);
+      setSelectedDate(freshDateOnly);
+      setDateWindowStart(freshDateOnly);
+      setMenuList([]);
+      lastMenuFetchAtRef.current = 0;
+      await fetchMenuWithRetry(0, true);
+      setPollRefreshKey((k) => k + 1);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchMemberStatus]);
 
   useEffect(() => {
     fetchMenuWithRetry();
@@ -329,11 +383,16 @@ const MemberDashboard = () => {
 
   const renderWeekCard = ({ item }) => {
     const isSelected = item.key === selectedDateKey;
+    const isToday = item.key === todayKey;
     return (
       <TouchableOpacity
         style={[styles.weekCard, isSelected && styles.weekCardActive]}
         activeOpacity={1}
-        onPress={() => setSelectedDate(new Date(item.date))}
+        disabled={!isToday}
+        onPress={() => {
+          if (!isToday) return;
+          setSelectedDate(new Date(item.date));
+        }}
       >
         <Text style={[styles.weekDayText, isSelected && styles.weekDayTextActive]}>
           {item.weekdayShort}
@@ -541,6 +600,13 @@ const MemberDashboard = () => {
         style={styles.bodyScroll}
         contentContainerStyle={styles.bodyContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={PRIMARY}
+          />
+        }
       >
         <View style={styles.sectionCard}>
           <View style={styles.weekRow}>
@@ -613,7 +679,7 @@ const MemberDashboard = () => {
             </TouchableOpacity>
           </View>
 
-          <MemberPollCard date={selectedDate} />
+          <MemberPollCard key={`poll-${pollRefreshKey}`} date={selectedDate} />
         </View>
       </ScrollView>
     </>
@@ -629,8 +695,16 @@ const MemberDashboard = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>{renderMiddleContent()}</View>
-      <PremiumBottomNav />
+      {memberStatusLoading ? (
+        <FullScreenLoading visible color="#111827" />
+      ) : isMemberInactive ? (
+        <MemberInactiveScreen memberId={memberId} onRefreshStatus={fetchMemberStatus} />
+      ) : (
+        <>
+          <View style={styles.container}>{renderMiddleContent()}</View>
+          <PremiumBottomNav />
+        </>
+      )}
     </SafeAreaView>
   );
 };

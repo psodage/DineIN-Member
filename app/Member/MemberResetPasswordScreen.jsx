@@ -15,6 +15,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { API_BASE_URL } from "../../config";
 import { useLanguage } from "../../LanguageContext";
 import LanguageToggle from "../../components/LanguageToggle";
+import FullScreenLoading from "../../components/FullScreenLoading";
 
 export default function MemberResetPasswordScreen() {
   const router = useRouter();
@@ -134,14 +135,10 @@ export default function MemberResetPasswordScreen() {
           onPress={handleVerifyOtp}
           disabled={loading || !otp || otp.length !== 6 || otpVerified}
         >
-          {loading ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+          {otpVerified ? (
+            <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
           ) : (
-            otpVerified ? (
-              <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-            ) : (
-              <Text style={styles.verifyButtonText}>{t("verify_otp_button")}</Text>
-            )
+            <Text style={styles.verifyButtonText}>{t("verify_otp_button")}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -171,12 +168,10 @@ export default function MemberResetPasswordScreen() {
         onPress={handleSubmit}
         disabled={!otpVerified || loading}
       >
-        {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.buttonText}>Reset Password</Text>
-        )}
+        <Text style={styles.buttonText}>Reset Password</Text>
       </TouchableOpacity>
+
+      <FullScreenLoading visible={loading} color="#000000" />
     </View>
   );
 }

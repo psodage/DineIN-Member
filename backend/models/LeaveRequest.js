@@ -8,11 +8,6 @@ const leaveRequestSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    roomNumber: {
-      type: String,
-      required: true,
-      trim: true,
-    },
     // Optional type of request, e.g. "Leave" or "Activation"
     type: {
       type: String,
@@ -27,13 +22,6 @@ const leaveRequestSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
-    reason: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-    // Marathi reason (optional; fallback to `reason`)
-    reasonMr: { type: String, trim: true, default: "" },
     status: {
       type: String,
       enum: ["Pending", "Approved", "Rejected"],

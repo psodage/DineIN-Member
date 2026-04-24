@@ -19,6 +19,7 @@ import { useLanguage } from "../../LanguageContext";
 import api from "../../lib/api";
 import { displayMealPlanMr, displayStatusMr } from "../../lib/memberLabelsMr";
 import MemberBill from "./MemberBill";
+import FullScreenLoading from "../../components/FullScreenLoading";
 
 const MemberProfile = ({ embedded = false, mode = "profile" }) => {
   const router = useRouter();
@@ -71,9 +72,7 @@ const MemberProfile = ({ embedded = false, mode = "profile" }) => {
   if (loading || !isAuthenticated) {
     return (
       <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#111827" />
-        </View>
+        <FullScreenLoading visible color="#111827" />
       </View>
     );
   }
@@ -81,9 +80,7 @@ const MemberProfile = ({ embedded = false, mode = "profile" }) => {
   if (profileLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#111827" />
-        </View>
+        <FullScreenLoading visible color="#111827" />
       </SafeAreaView>
     );
   }

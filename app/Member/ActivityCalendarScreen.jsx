@@ -18,6 +18,7 @@ import { useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../lib/AuthContext";
 import api from "../../lib/api";
+import FullScreenLoading from "../../components/FullScreenLoading";
 
 const PRIMARY = "#0F8F88";
 const BG = "#F5F7FA";
@@ -27,6 +28,8 @@ const GREEN_BG = "#DDF5E8";
 const GREEN_TEXT = "#188A5A";
 const RED_BG = "#FCE8EA";
 const RED_TEXT = "#BE3845";
+const GREY_BG = "#E5E7EB";
+const GREY_TEXT = "#6B7280";
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTHS = [
   "January",
@@ -42,7 +45,6 @@ const MONTHS = [
   "November",
   "December",
 ];
-const MONTHLY_LEAVE_ALLOWANCE = 20;
 
 function monthKeyLocal(dateLike) {
   const d = new Date(dateLike);
@@ -52,12 +54,34 @@ function monthKeyLocal(dateLike) {
   return `${y}-${m}`;
 }
 
+function toLocalYmd(dateLike) {
+  const d = new Date(dateLike);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function parseYmdLocal(ymd) {
+  const match = String(ymd || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const d = new Date(year, monthIndex, day);
+  if (d.getFullYear() !== year || d.getMonth() !== monthIndex || d.getDate() !== day) {
+    return null;
+  }
+  return d;
+}
+
 function extractDayFromKey(dayKey) {
   if (!dayKey) return null;
-  const s = String(dayKey).trim();
-  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return null;
-  return Number(match[3]);
+  const localYmd = toLocalYmd(dayKey);
+  if (!localYmd) return null;
+  const match = localYmd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? Number(match[3]) : null;
 }
 
 function formatDateLabel(dateLike) {
@@ -95,13 +119,15 @@ function toMonthKey(year, monthIndex) {
   return `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
 }
 
-function normalizedBillStatus({ dueAmount, paidAmount, monthlyStatus }) {
-  const due = Number(dueAmount || 0);
-  const paid = Number(paidAmount || 0);
-  if (due <= 0) return "Paid";
-  if (paid > 0) return "Partial";
-  const status = String(monthlyStatus || "").trim();
-  return status || "Pending";
+function hasDateInMonth(dateLike, targetMonthKey) {
+  if (!dateLike || !targetMonthKey) return false;
+  return monthKeyLocal(dateLike) === targetMonthKey;
+}
+
+function toTitleCaseStatus(value) {
+  const s = String(value || "").trim().toLowerCase();
+  if (!s) return "";
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 export default function ActivityCalendarScreen({ embedded = false }) {
@@ -120,10 +146,15 @@ export default function ActivityCalendarScreen({ embedded = false }) {
   const [monthLeaveSummary, setMonthLeaveSummary] = useState(null);
   const [billSummary, setBillSummary] = useState(null);
   const [leaveDates, setLeaveDates] = useState(new Set());
-  const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
-  const [applyStartDate, setApplyStartDate] = useState("");
-  const [applyEndDate, setApplyEndDate] = useState("");
-  const [applyReason, setApplyReason] = useState("");
+  const [leaveRequestStats, setLeaveRequestStats] = useState({
+    total: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    latestStatus: "",
+  });
+  const [isConfirmApplyModalOpen, setIsConfirmApplyModalOpen] = useState(false);
+  const [isLeaveSuccessModalOpen, setIsLeaveSuccessModalOpen] = useState(false);
   const [submittingLeave, setSubmittingLeave] = useState(false);
   const tabScaleRef = useRef({
     home: new Animated.Value(1),
@@ -165,9 +196,13 @@ export default function ActivityCalendarScreen({ embedded = false }) {
         setBillSummary(billRes?.data || null);
         setMonthLeaveSummary(leaveRes?.data || null);
 
-        const leaveKeys = Array.isArray(leaveRes?.data?.approvedLeaveDates)
+        const leaveKeysFromRequests = Array.isArray(leaveRes?.data?.approvedLeaveDates)
           ? leaveRes.data.approvedLeaveDates
           : [];
+        const leaveKeysFromStats = Array.isArray(billRes?.data?.inactiveDayKeys)
+          ? billRes.data.inactiveDayKeys
+          : [];
+        const leaveKeys = leaveKeysFromStats.length ? leaveKeysFromStats : leaveKeysFromRequests;
         setLeaveDates(
           new Set(
             leaveKeys
@@ -175,6 +210,28 @@ export default function ActivityCalendarScreen({ embedded = false }) {
               .filter((day) => Number.isInteger(day) && day > 0)
           )
         );
+
+        const requests = Array.isArray(leaveRes?.data?.requests) ? leaveRes.data.requests : [];
+        const requestCounts = requests.reduce(
+          (acc, request) => {
+            const normalized = String(request?.status || "").trim().toLowerCase();
+            if (normalized === "pending") acc.pending += 1;
+            else if (normalized === "approved") acc.approved += 1;
+            else if (normalized === "rejected") acc.rejected += 1;
+            return acc;
+          },
+          { pending: 0, approved: 0, rejected: 0 }
+        );
+        const latestRequest = requests
+          .slice()
+          .sort((a, b) => new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime())[0];
+        setLeaveRequestStats({
+          total: requests.length,
+          pending: requestCounts.pending,
+          approved: requestCounts.approved,
+          rejected: requestCounts.rejected,
+          latestStatus: toTitleCaseStatus(latestRequest?.status),
+        });
       } catch (error) {
         console.error("Leaves month fetch error:", error);
         if (!isRefresh) {
@@ -182,6 +239,13 @@ export default function ActivityCalendarScreen({ embedded = false }) {
           setBillSummary(null);
           setMonthLeaveSummary(null);
           setLeaveDates(new Set());
+          setLeaveRequestStats({
+            total: 0,
+            pending: 0,
+            approved: 0,
+            rejected: 0,
+            latestStatus: "",
+          });
         }
       } finally {
         setLoading(false);
@@ -191,33 +255,62 @@ export default function ActivityCalendarScreen({ embedded = false }) {
     [memberId, monthKey]
   );
 
+  const canNavigateToMonth = useCallback(
+    async (targetDate) => {
+      if (!memberId) return false;
+      const targetKey = toMonthKey(targetDate.getFullYear(), targetDate.getMonth());
+      try {
+        const [billRes, leaveRes] = await Promise.all([
+          api.get(`/api/member-monthly-due/${memberId}?month=${targetKey}`),
+          api.get(`/api/leave/self/${memberId}/month?month=${targetKey}`),
+        ]);
+
+        const bill = billRes?.data || {};
+        const leave = leaveRes?.data || {};
+        const inactiveDayKeys = Array.isArray(bill?.inactiveDayKeys) ? bill.inactiveDayKeys : [];
+        const requests = Array.isArray(leave?.requests) ? leave.requests : [];
+        const approvedLeaveDates = Array.isArray(leave?.approvedLeaveDates) ? leave.approvedLeaveDates : [];
+
+        const hasInactiveDates = inactiveDayKeys.some((key) => hasDateInMonth(key, targetKey));
+        const hasApprovedDates = approvedLeaveDates.some((date) => hasDateInMonth(date, targetKey));
+        const hasRequestedDates = requests.some((request) => {
+          const start = request?.startDate || request?.fromDate || request?.date;
+          const end = request?.endDate || request?.toDate || start;
+          return hasDateInMonth(start, targetKey) || hasDateInMonth(end, targetKey);
+        });
+
+        const hasLeaveData =
+          hasInactiveDates ||
+          hasApprovedDates ||
+          hasRequestedDates ||
+          Number(leave?.approvedLeaveCount || 0) > 0 ||
+          Number(leave?.pendingRequestCount || 0) > 0;
+
+        return hasLeaveData;
+      } catch (error) {
+        console.error("Month availability check failed:", error);
+        return false;
+      }
+    },
+    [memberId]
+  );
+
   useEffect(() => {
     loadMonthData(false);
   }, [loadMonthData]);
 
   const leaveTakenDays = leaveDates;
-  const inactiveDaysCount = Number(monthLeaveSummary?.approvedLeaveCount || 0) || leaveTakenDays.size;
-  const monthlyAllowance = MONTHLY_LEAVE_ALLOWANCE;
-  const leavesAvailableCount = Math.max(0, monthlyAllowance - inactiveDaysCount);
-  const totalBill = Number(billSummary?.totalBill || 0);
-  const paidAmount = Number(billSummary?.paidAmount || 0);
-  const dueAmount = Number(billSummary?.remainingAmount ?? billSummary?.monthlyDue ?? 0);
-  const monthlyStatus = normalizedBillStatus({
-    dueAmount,
-    paidAmount,
-    monthlyStatus: billSummary?.monthlyStatus,
-  });
+  const leaveStreakRequiredDays = Number(monthLeaveSummary?.leaveStreakRequiredDays || 5);
+  const inactiveDaysCount = Number(billSummary?.inactiveDays || 0) || Number(monthLeaveSummary?.approvedLeaveCount || 0) || leaveTakenDays.size;
+  const leaveBadgeText = leaveRequestStats.pending > 0
+    ? `${leaveRequestStats.pending} Pending`
+    : leaveRequestStats.latestStatus || "No Requests";
+  const leaveSummaryText = leaveRequestStats.total > 0
+    ? `${leaveRequestStats.approved} Approved • ${leaveRequestStats.rejected} Rejected`
+    : "No leave requests in this month";
   const nextResetDate = new Date(year, monthIndex + 1, 1);
-  const billSummaryText = `Total ₹${totalBill.toLocaleString("en-IN")} • Paid ₹${paidAmount.toLocaleString("en-IN")} • Due ₹${Math.max(0, dueAmount).toLocaleString("en-IN")}`;
 
-  const onChangeMonth = (delta) => {
-    setSelectedMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
-  };
-
-  const onPickDay = (day) => {
-    if (!day) return;
-    setSelectedDate(new Date(year, monthIndex, day));
-  };
+  const onChangeMonth = async () => {};
 
   const getScale = (key) => tabScaleRef.current[key] || new Animated.Value(1);
   const animateTab = (key) => {
@@ -240,41 +333,24 @@ export default function ActivityCalendarScreen({ embedded = false }) {
   };
 
   const openApplyWithSelectedDate = () => {
-    const seedDate = selectedDate && selectedDate.getMonth() === monthIndex && selectedDate.getFullYear() === year
-      ? selectedDate
-      : new Date(year, monthIndex, 1);
-    const ymd = monthKeyLocal(seedDate);
-    const day = String(seedDate.getDate()).padStart(2, "0");
-    const seedYmd = `${ymd}-${day}`;
-    setApplyStartDate(seedYmd);
-    setApplyEndDate(seedYmd);
-    setApplyReason("");
-    setIsApplyModalOpen(true);
+    setIsConfirmApplyModalOpen(true);
   };
 
   const submitLeaveApplication = async () => {
     if (!memberId) return;
-    if (!applyStartDate || !applyEndDate) {
-      Alert.alert("Missing dates", "Please select start and end date.");
-      return;
-    }
-    if (new Date(applyEndDate) < new Date(applyStartDate)) {
-      Alert.alert("Invalid range", "End date must be on or after start date.");
-      return;
-    }
+    const todayYmd = toLocalYmd(new Date());
 
     try {
       setSubmittingLeave(true);
       await api.post("/api/leave/apply", {
         memberId,
-        startDate: applyStartDate,
-        endDate: applyEndDate,
-        reason: applyReason.trim(),
+        startDate: todayYmd,
+        endDate: todayYmd,
         type: "Leave",
       });
-      setIsApplyModalOpen(false);
+      setIsConfirmApplyModalOpen(false);
       await loadMonthData(true);
-      Alert.alert("Success", "Leave request submitted successfully.");
+      setIsLeaveSuccessModalOpen(true);
     } catch (error) {
       console.error("Leave apply error:", error);
       Alert.alert("Error", error?.response?.data?.message || "Failed to submit leave request.");
@@ -284,31 +360,34 @@ export default function ActivityCalendarScreen({ embedded = false }) {
   };
 
   const renderDayTile = ({ item, index }) => {
-    if (!item) return <View style={styles.dayPlaceholder} />;
+    const spacingStyle = index % 7 !== 6 ? styles.dayTileSpacing : null;
+    if (!item) return <View style={[styles.dayPlaceholder, spacingStyle]} />;
     const isSelected = item === selectedDay;
     const isLeaveTaken = leaveTakenDays.has(item);
+    const today = new Date();
+    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const cellDate = new Date(year, monthIndex, item);
+    const isFuture = cellDate > todayOnly;
 
     return (
-      <TouchableOpacity
+      <View
         style={[
           styles.dayTile,
-          isLeaveTaken ? styles.dayTileLeave : styles.dayTileAvailable,
+          isFuture ? styles.dayTileFuture : isLeaveTaken ? styles.dayTileLeave : styles.dayTileAvailable,
           isSelected && styles.dayTileSelected,
-          index % 7 !== 6 && styles.dayTileSpacing,
+          spacingStyle,
         ]}
-        activeOpacity={0.88}
-        onPress={() => onPickDay(item)}
       >
         <Text
           style={[
             styles.dayTileText,
-            isLeaveTaken ? styles.dayTileTextLeave : styles.dayTileTextAvailable,
+            isFuture ? styles.dayTileTextFuture : isLeaveTaken ? styles.dayTileTextLeave : styles.dayTileTextAvailable,
             isSelected && styles.dayTileTextSelected,
           ]}
         >
           {item}
         </Text>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -322,6 +401,7 @@ export default function ActivityCalendarScreen({ embedded = false }) {
       <ScrollView
         style={styles.pageScroll}
         contentContainerStyle={[styles.pageContent, { paddingBottom: contentBottomPadding }]}
+        scrollEnabled={false}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadMonthData(true)} tintColor={PRIMARY} />}
       >
@@ -330,17 +410,8 @@ export default function ActivityCalendarScreen({ embedded = false }) {
           <Ionicons name="pizza-outline" size={58} color="rgba(255,255,255,0.11)" style={styles.patternTwo} />
           <Ionicons name="ice-cream-outline" size={44} color="rgba(255,255,255,0.10)" style={styles.patternThree} />
 
-          <View style={styles.heroTopRow}>
-            <TouchableOpacity
-              style={styles.roundedIconBtn}
-              activeOpacity={0.85}
-              onPress={() => {
-                if (embedded) onTabPress("home");
-                else router.back();
-              }}
-            >
-              <Ionicons name="chevron-back" size={18} color={TEXT_DARK} />
-            </TouchableOpacity>
+          {/*<View style={styles.heroTopRow}>
+           
 
             <TouchableOpacity
               style={styles.historyPill}
@@ -350,19 +421,60 @@ export default function ActivityCalendarScreen({ embedded = false }) {
               <Ionicons name="time-outline" size={14} color={PRIMARY} />
               <Text style={styles.historyPillText}>Leave History</Text>
             </TouchableOpacity>
-          </View>
+          </View>*/}
 
           <Text style={styles.heroTitle}>My Leaves</Text>
           <Text style={styles.heroSubtitle}>Manage your leave days easily</Text>
         </View>
 
         <View style={styles.mainCard}>
+        <View style={styles.summaryCard}>
+            <View style={styles.summaryRow}>
+            <View style={styles.statsCard}>
+            <View style={styles.statsBlock}>
+              <Text style={styles.statsLabel}>Leaves Taken</Text>
+              <Text style={styles.statsValue}>{inactiveDaysCount} Days</Text>
+            </View>
+            <View style={styles.statsDivider} />
+            <View style={styles.statsBlock}>
+              <Text style={styles.statsLabel}>Leaves Streak Required</Text>
+              <Text style={styles.statsValue}>{leaveStreakRequiredDays} Days</Text>
+            </View>
+            <View style={styles.statsDivider} />
+            <View style={styles.statsBlock}>
+              <Text style={styles.statsLabel}>Next Reset Date</Text>
+              <Text style={styles.statsValue}>{formatDateLabel(nextResetDate)}</Text>
+            </View>
+          </View>
+            </View>
+            <View style={styles.summaryDivider} />
+            
+          <View style={styles.summaryRow}>
+            <TouchableOpacity
+              style={[styles.applyCard, styles.applyCardNoContainer]}
+              activeOpacity={0.9}
+              onPress={openApplyWithSelectedDate}
+            >
+              <View style={styles.applyIconBox}>
+                <Ionicons name="calendar-outline" size={18} color={PRIMARY} />
+              </View>
+              <View style={styles.applyTextWrap}>
+                <Text style={styles.applyTitle}>Apply for Leave</Text>
+                <Text style={styles.applySub}>{leaveSummaryText}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={TEXT_MUTE} />
+              <View style={[styles.pendingBadge, styles.pendingBadgeOnCard]}>
+                <Text style={styles.pendingBadgeText}>{leaveBadgeText}</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+          </View>
           <View style={styles.monthRow}>
-            <TouchableOpacity style={styles.monthNavBtn} activeOpacity={0.88} onPress={() => onChangeMonth(-1)}>
+            <TouchableOpacity style={styles.monthNavBtn} activeOpacity={0.88} onPress={onChangeMonth} disabled>
               <Ionicons name="chevron-back" size={18} color={PRIMARY} />
             </TouchableOpacity>
             <Text style={styles.monthTitle}>{monthTitle}</Text>
-            <TouchableOpacity style={styles.monthNavBtn} activeOpacity={0.88} onPress={() => onChangeMonth(1)}>
+            <TouchableOpacity style={styles.monthNavBtn} activeOpacity={0.88} onPress={onChangeMonth} disabled>
               <Ionicons name="chevron-forward" size={18} color={PRIMARY} />
             </TouchableOpacity>
           </View>
@@ -375,38 +487,8 @@ export default function ActivityCalendarScreen({ embedded = false }) {
             ))}
           </View>
 
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryRow}>
-              <View style={styles.summaryIconBox}>
-              <Ionicons name="calendar-outline" size={15} color={PRIMARY} />
-              </View>
-              <View style={styles.summaryMainBlock}>
-                <Text style={styles.summaryTitle}>Monthly Leave Days</Text>
-                <Text style={styles.summaryValue}>{inactiveDaysCount} Days</Text>
-                <Text style={styles.summarySub}>Total Available</Text>
-              </View>
-            </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryRow}>
-              <View style={styles.summaryIconBox}>
-                <Ionicons name="receipt-outline" size={15} color={TEXT_MUTE} />
-              </View>
-              <View style={styles.summaryMainBlock}>
-                <Text style={styles.summaryTitle}>Monthly Bill</Text>
-                <Text style={styles.billValue}>{billSummaryText}</Text>
-              </View>
-              <View style={styles.pendingBadge}>
-                <Text style={styles.pendingBadgeText}>{monthlyStatus}</Text>
-              </View>
-            </View>
-          </View>
+          
 
-          {loading && (
-            <View style={styles.loadingInline}>
-              <ActivityIndicator size="small" color={PRIMARY} />
-              <Text style={styles.loadingInlineText}>Loading month data...</Text>
-            </View>
-          )}
 
           <FlatList
             data={calendarData}
@@ -420,45 +502,24 @@ export default function ActivityCalendarScreen({ embedded = false }) {
           <View style={styles.legendRow}>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: "#10B981" }]} />
-              <Text style={styles.legendText}>Available</Text>
+              <Text style={styles.legendText}>Active</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: "#F59AA4" }]} />
-              <Text style={styles.legendText}>Leave Taken</Text>
+              <Text style={styles.legendText}>Inactive</Text>
             </View>
             <View style={styles.legendItem}>
-              <View style={styles.legendDotSelected} />
-              <Text style={styles.legendText}>Selected</Text>
+              <View style={[styles.legendDot, { backgroundColor: "#9CA3AF" }]} />
+              <Text style={styles.legendText}>Future</Text>
             </View>
           </View>
-
-          <TouchableOpacity style={styles.applyCard} activeOpacity={0.9} onPress={openApplyWithSelectedDate}>
-            <View style={styles.applyIconBox}>
-              <Ionicons name="calendar-outline" size={18} color={PRIMARY} />
-            </View>
-            <View style={styles.applyTextWrap}>
-              <Text style={styles.applyTitle}>Apply for Leave</Text>
-              <Text style={styles.applySub}>Select dates and submit your leave request</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={TEXT_MUTE} />
-          </TouchableOpacity>
-
-          <View style={styles.statsCard}>
-            <View style={styles.statsBlock}>
-              <Text style={styles.statsLabel}>Leaves Taken</Text>
-              <Text style={styles.statsValue}>{inactiveDaysCount} Days</Text>
-            </View>
-            <View style={styles.statsDivider} />
-            <View style={styles.statsBlock}>
-              <Text style={styles.statsLabel}>Leaves Available</Text>
-              <Text style={styles.statsValue}>{leavesAvailableCount} Days</Text>
-            </View>
-            <View style={styles.statsDivider} />
-            <View style={styles.statsBlock}>
-              <Text style={styles.statsLabel}>Next Reset Date</Text>
-              <Text style={styles.statsValue}>{formatDateLabel(nextResetDate)}</Text>
-            </View>
+          <View style={styles.legendSummaryWrap}>
+            <Text style={styles.legendSummaryText}>Active, Inactive, Future</Text>
           </View>
+
+         
+
+         
 
           {!loading && !memberDetails && (
             <Text style={styles.emptyHintText}>No member data found for this account.</Text>
@@ -466,50 +527,28 @@ export default function ActivityCalendarScreen({ embedded = false }) {
         </View>
       </ScrollView>
 
+      <FullScreenLoading visible={loading && !refreshing} color={PRIMARY} />
+
       <Modal
         transparent
         animationType="fade"
-        visible={isApplyModalOpen}
-        onRequestClose={() => setIsApplyModalOpen(false)}
+        visible={isConfirmApplyModalOpen}
+        onRequestClose={() => setIsConfirmApplyModalOpen(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Apply for Leave</Text>
-            <Text style={styles.modalLabel}>Start Date (YYYY-MM-DD)</Text>
-            <TextInput
-              value={applyStartDate}
-              onChangeText={setApplyStartDate}
-              style={styles.modalInput}
-              placeholder="2026-04-23"
-              placeholderTextColor="#94A3B8"
-              autoCapitalize="none"
-            />
-            <Text style={styles.modalLabel}>End Date (YYYY-MM-DD)</Text>
-            <TextInput
-              value={applyEndDate}
-              onChangeText={setApplyEndDate}
-              style={styles.modalInput}
-              placeholder="2026-04-23"
-              placeholderTextColor="#94A3B8"
-              autoCapitalize="none"
-            />
-            <Text style={styles.modalLabel}>Reason</Text>
-            <TextInput
-              value={applyReason}
-              onChangeText={setApplyReason}
-              style={[styles.modalInput, styles.modalReasonInput]}
-              placeholder="Enter reason for leave"
-              placeholderTextColor="#94A3B8"
-              multiline
-            />
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>Confirm to apply for leave?</Text>
+            <Text style={styles.confirmSubtitle}>
+              Leave start date: {toLocalYmd(new Date())}
+            </Text>
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={[styles.modalBtn, styles.modalCancelBtn]}
                 activeOpacity={0.88}
-                onPress={() => setIsApplyModalOpen(false)}
+                onPress={() => setIsConfirmApplyModalOpen(false)}
                 disabled={submittingLeave}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>Back</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalBtn, styles.modalSubmitBtn]}
@@ -517,7 +556,30 @@ export default function ActivityCalendarScreen({ embedded = false }) {
                 onPress={submitLeaveApplication}
                 disabled={submittingLeave}
               >
-                <Text style={styles.modalSubmitText}>{submittingLeave ? "Submitting..." : "Submit"}</Text>
+                <Text style={styles.modalSubmitText}>{submittingLeave ? "Submitting..." : "Confirm"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={isLeaveSuccessModalOpen}
+        onRequestClose={() => setIsLeaveSuccessModalOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>Leave request submitted</Text>
+            <Text style={styles.confirmSubtitle}>Your leave request has been sent successfully.</Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalSubmitBtn]}
+                activeOpacity={0.88}
+                onPress={() => setIsLeaveSuccessModalOpen(false)}
+              >
+                <Text style={styles.modalSubmitText}>OK</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -567,7 +629,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     paddingHorizontal: 14,
-    paddingBottom: 74,
+    paddingBottom: 90,
     overflow: "hidden",
   },
   patternOne: {
@@ -602,6 +664,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   historyPill: {
+    marginTop: 10,
+    marginLeft:245,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -616,7 +680,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   heroTitle: {
-    marginTop: 14,
+    marginTop: 25,
     color: "#FFFFFF",
     fontSize: 30,
     fontWeight: "800",
@@ -629,8 +693,9 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   mainCard: {
-    marginTop: 0,
-    marginHorizontal: 10,
+    minHeight: 700,
+    marginTop: -30,
+    marginHorizontal: 0,
     borderRadius: 18,
     backgroundColor: "#FFFFFF",
     padding: 9,
@@ -641,6 +706,7 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   monthRow: {
+    marginTop: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -731,6 +797,12 @@ const styles = StyleSheet.create({
     borderColor: "#E08C94",
     paddingVertical: 4,
     paddingHorizontal: 10,
+    backgroundColor: "#FFF5F6",
+  },
+  pendingBadgeOnCard: {
+    position: "absolute",
+    top: 8,
+    right: 8,
   },
   pendingBadgeText: {
     color: "#9F2430",
@@ -743,7 +815,7 @@ const styles = StyleSheet.create({
   dayPlaceholder: {
     width: "13%",
     aspectRatio: 1,
-    marginBottom: 6,
+    marginBottom: 5,
   },
   dayTile: {
     width: "13%",
@@ -765,6 +837,10 @@ const styles = StyleSheet.create({
     backgroundColor: RED_BG,
     borderColor: "#F8CDD2",
   },
+  dayTileFuture: {
+    backgroundColor: GREY_BG,
+    borderColor: "#D1D5DB",
+  },
   dayTileSelected: {
     backgroundColor: "#FFFFFF",
     borderColor: "#1F2937",
@@ -779,6 +855,9 @@ const styles = StyleSheet.create({
   },
   dayTileTextLeave: {
     color: RED_TEXT,
+  },
+  dayTileTextFuture: {
+    color: GREY_TEXT,
   },
   dayTileTextSelected: {
     color: "#111827",
@@ -812,6 +891,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
   },
+  legendSummaryText: {
+    textAlign: "center",
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  legendSummaryWrap: {
+    marginTop: 8,
+    marginBottom: 4,
+    alignItems: "center",
+  },
   applyCard: {
     marginTop: 8,
     borderRadius: 12,
@@ -826,6 +916,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 10,
     elevation: 3,
+  },
+  applyCardNoContainer: {
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   applyIconBox: {
     width: 30,
@@ -880,23 +977,6 @@ const styles = StyleSheet.create({
     height: "78%",
     backgroundColor: "rgba(255,255,255,0.35)",
   },
-  loadingInline: {
-    marginTop: 8,
-    borderRadius: 10,
-    backgroundColor: "#F0FDFA",
-    borderWidth: 1,
-    borderColor: "#CCFBF1",
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  loadingInlineText: {
-    color: "#0F766E",
-    fontSize: 12,
-    fontWeight: "600",
-  },
   emptyHintText: {
     marginTop: 10,
     textAlign: "center",
@@ -917,6 +997,24 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "#FFFFFF",
     padding: 14,
+  },
+  confirmCard: {
+    width: "100%",
+    maxWidth: 390,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    padding: 14,
+  },
+  confirmTitle: {
+    color: TEXT_DARK,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  confirmSubtitle: {
+    marginTop: 6,
+    color: TEXT_MUTE,
+    fontSize: 12,
+    fontWeight: "600",
   },
   modalTitle: {
     color: TEXT_DARK,

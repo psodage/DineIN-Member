@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import api from "../../lib/api";
 import { useAuth } from "../../lib/AuthContext";
+import FullScreenLoading from "../../components/FullScreenLoading";
 
 const PRIMARY = "#0F8F88";
 const BG = "#F5F7FA";
@@ -102,20 +103,16 @@ export default function LeaveHistoryScreen() {
         <View style={styles.backBtn} />
       </View>
 
-      {loading ? (
-        <View style={styles.loaderWrap}>
-          <ActivityIndicator size="large" color={PRIMARY} />
-        </View>
-      ) : (
-        <FlatList
-          data={history}
-          keyExtractor={(item, index) => String(item?._id || index)}
-          renderItem={renderItem}
-          contentContainerStyle={history.length ? styles.listContent : styles.emptyContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadHistory(true)} tintColor={PRIMARY} />}
-          ListEmptyComponent={<Text style={styles.emptyText}>{emptyText}</Text>}
-        />
-      )}
+      <FlatList
+        data={history}
+        keyExtractor={(item, index) => String(item?._id || index)}
+        renderItem={renderItem}
+        contentContainerStyle={history.length ? styles.listContent : styles.emptyContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadHistory(true)} tintColor={PRIMARY} />}
+        ListEmptyComponent={<Text style={styles.emptyText}>{emptyText}</Text>}
+      />
+
+      <FullScreenLoading visible={loading && !refreshing} color={PRIMARY} />
     </SafeAreaView>
   );
 }
@@ -138,7 +135,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: { color: TEXT_DARK, fontSize: 18, fontWeight: "800" },
-  loaderWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
   listContent: { paddingHorizontal: 12, paddingBottom: 24, gap: 10 },
   rowCard: {
     backgroundColor: "#FFFFFF",

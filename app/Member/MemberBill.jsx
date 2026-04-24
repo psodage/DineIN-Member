@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../lib/AuthContext";
 import api from "../../lib/api";
+import FullScreenLoading from "../../components/FullScreenLoading";
 
 const COLORS = {
   bgPremium: "#F5F7FA",
@@ -95,6 +96,10 @@ const MemberBill = ({ embedded = false }) => {
   const memberId = user?.id || user?._id;
 
   const [monthSummary, setMonthSummary] = useState(null);
+  const [activeMonthSummary, setActiveMonthSummary] = useState(null);
+  const [selectedMonthKey, setSelectedMonthKey] = useState("");
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isMonthLoading, setIsMonthLoading] = useState(false);
   const [payments, setPayments] = useState([]);
   const [monthlyDueHistory, setMonthlyDueHistory] = useState([]);
   const [lifetimeBreakdown, setLifetimeBreakdown] = useState({
@@ -108,13 +113,27 @@ const MemberBill = ({ embedded = false }) => {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      if (!memberId) return;
+      if (!memberId) {
+        if (!cancelled) setIsInitialLoading(false);
+        return;
+      }
       try {
         const res = await api.get(`/api/member-monthly-due/${memberId}/current`);
-        if (!cancelled) setMonthSummary(res?.data || null);
+        if (!cancelled) {
+          const summary = res?.data || null;
+          setActiveMonthSummary(summary);
+          setMonthSummary(summary);
+          setSelectedMonthKey(monthKeyLocal(summary?.month));
+        }
       } catch (e) {
         console.error("Member bill month summary fetch error:", e);
-        if (!cancelled) setMonthSummary(null);
+        if (!cancelled) {
+          setActiveMonthSummary(null);
+          setMonthSummary(null);
+          setSelectedMonthKey("");
+        }
+      } finally {
+        if (!cancelled) setIsInitialLoading(false);
       }
     }
     load();
@@ -208,6 +227,27 @@ const MemberBill = ({ embedded = false }) => {
 
   useEffect(() => {
     let cancelled = false;
+    async function loadMonthByKey() {
+      if (!memberId || !selectedMonthKey) return;
+      try {
+        setIsMonthLoading(true);
+        const res = await api.get(`/api/member-monthly-due/${memberId}?month=${selectedMonthKey}`);
+        if (!cancelled) setMonthSummary(res?.data || null);
+      } catch (e) {
+        console.error("Member bill selected month summary fetch error:", e);
+        if (!cancelled) setMonthSummary(null);
+      } finally {
+        if (!cancelled) setIsMonthLoading(false);
+      }
+    }
+    loadMonthByKey();
+    return () => {
+      cancelled = true;
+    };
+  }, [memberId, selectedMonthKey]);
+
+  useEffect(() => {
+    let cancelled = false;
     async function load() {
       if (!memberId) return;
       try {
@@ -277,8 +317,8 @@ const MemberBill = ({ embedded = false }) => {
   const dueRatio = 1 - paidRatio;
 
   const currentMonthDueAmount = useMemo(() => {
-    return Number(monthSummary?.due ?? monthSummary?.monthlyDue ?? 0);
-  }, [monthSummary]);
+    return Number(activeMonthSummary?.due ?? activeMonthSummary?.monthlyDue ?? 0);
+  }, [activeMonthSummary]);
 
   const totalDueAllMonths = useMemo(() => {
     return monthlyDueHistory.reduce((sum, row) => sum + Number(row?.due || 0), 0);
@@ -303,6 +343,39 @@ const MemberBill = ({ embedded = false }) => {
     });
   }, [payments, monthSummary?.month]);
 
+  const availableMonthKeys = useMemo(() => {
+    const keys = new Set(
+      monthlyDueHistory
+        .map((row) => monthKeyLocal(row?.month))
+        .filter((key) => Boolean(key))
+    );
+    const activeMonthKey = monthKeyLocal(monthSummary?.month);
+    if (activeMonthKey) keys.add(activeMonthKey);
+    return Array.from(keys).sort();
+  }, [monthlyDueHistory, monthSummary?.month]);
+
+  useEffect(() => {
+    if (!availableMonthKeys.length) return;
+    if (selectedMonthKey && availableMonthKeys.includes(selectedMonthKey)) return;
+    const fallbackMonthKey = availableMonthKeys[availableMonthKeys.length - 1];
+    setSelectedMonthKey(fallbackMonthKey);
+  }, [availableMonthKeys, selectedMonthKey]);
+
+  const selectedMonthIndex = useMemo(() => {
+    return availableMonthKeys.indexOf(selectedMonthKey);
+  }, [availableMonthKeys, selectedMonthKey]);
+
+  const hasPreviousMonth = selectedMonthIndex > 0;
+  const hasNextMonth =
+    selectedMonthIndex >= 0 && selectedMonthIndex < availableMonthKeys.length - 1;
+
+  const switchMonth = (direction) => {
+    if (!availableMonthKeys.length || selectedMonthIndex < 0 || isMonthLoading) return;
+    const nextIndex = selectedMonthIndex + direction;
+    if (nextIndex < 0 || nextIndex >= availableMonthKeys.length) return;
+    setSelectedMonthKey(availableMonthKeys[nextIndex]);
+  };
+
   const previousBillsData = useMemo(() => {
     const targetMonthKey = monthSummary?.month ? monthKeyLocal(monthSummary.month) : "";
     const rows = monthlyDueHistory
@@ -323,7 +396,10 @@ const MemberBill = ({ embedded = false }) => {
   }, [monthlyDueHistory, monthSummary?.month]);
 
   const chargesData = useMemo(() => {
-    const mealAmount = Number(lifetimeBreakdown?.mealAmount || 0);
+    const mealAmount = monthlyDueHistory.reduce(
+      (sum, row) => sum + Number(row?.due || 0) + Number(row?.collected || 0),
+      0
+    );
     const snacksAmount = Number(lifetimeBreakdown?.snacksAmount || 0);
     const expenseShare = Number(lifetimeBreakdown?.expenseShare || 0);
     const leaveDeduction = Number(lifetimeBreakdown?.leaveDeduction || 0);
@@ -367,7 +443,7 @@ const MemberBill = ({ embedded = false }) => {
         iconBg: "#FFEDEE",
       },
     ];
-  }, [lifetimeBreakdown]);
+  }, [lifetimeBreakdown, monthlyDueHistory]);
 
   const content = (
     <ScrollView
@@ -410,9 +486,35 @@ const MemberBill = ({ embedded = false }) => {
       </View>
 
       <View style={styles.floatingSummaryCard}>
+        <View style={styles.monthSwitcherBar}>
+          <TouchableOpacity
+            style={[styles.monthNavButton, !hasPreviousMonth && styles.monthNavButtonDisabled]}
+            activeOpacity={0.8}
+            onPress={() => switchMonth(-1)}
+            disabled={!hasPreviousMonth || isMonthLoading}
+          >
+            <Ionicons
+              name="chevron-back"
+              size={16}
+              color={hasPreviousMonth ? COLORS.textNavy : "#B8C2CC"}
+            />
+          </TouchableOpacity>
+          <Text style={styles.summaryMonth}>{premiumSummary.month}</Text>
+          <TouchableOpacity
+            style={[styles.monthNavButton, !hasNextMonth && styles.monthNavButtonDisabled]}
+            activeOpacity={0.8}
+            onPress={() => switchMonth(1)}
+            disabled={!hasNextMonth || isMonthLoading}
+          >
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={hasNextMonth ? COLORS.textNavy : "#B8C2CC"}
+            />
+          </TouchableOpacity>
+        </View>
         <View style={styles.summaryRow}>
           <View style={[styles.summaryCol, styles.summaryColWide]}>
-            <Text style={styles.summaryMonth}>{premiumSummary.month}</Text>
             <Text style={styles.summaryLabel}>Total Bill Amount</Text>
             <Text style={styles.summaryPrimaryAmount}>
               ₹{currentMonthDueAmount.toLocaleString("en-IN")}
@@ -523,16 +625,25 @@ const MemberBill = ({ embedded = false }) => {
         </View>
       ) : null}
 
-      <TouchableOpacity style={styles.downloadButton} activeOpacity={0.9}>
-        <Ionicons name="document-attach-outline" size={18} color="#FFFFFF" />
-        <Text style={styles.downloadButtonText}>Download Bill PDF</Text>
-      </TouchableOpacity>
+    
     </ScrollView>
   );
 
-  if (embedded) return content;
+  if (embedded) {
+    return (
+      <>
+        {content}
+        <FullScreenLoading visible={isInitialLoading || isMonthLoading} color="#111827" />
+      </>
+    );
+  }
 
-  return <SafeAreaView style={styles.container}>{content}</SafeAreaView>;
+  return (
+    <SafeAreaView style={styles.container}>
+      {content}
+      <FullScreenLoading visible={isInitialLoading || isMonthLoading} color="#111827" />
+    </SafeAreaView>
+  );
 };
 
 export default MemberBill;
@@ -646,7 +757,33 @@ const styles = StyleSheet.create({
     color: COLORS.textNavy,
     fontSize: 17,
     fontWeight: "800",
-    marginBottom: 2,
+  },
+  monthSwitcherBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+    paddingHorizontal: 2,
+  },
+  monthSwitcherRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+    alignSelf: "flex-start",
+  },
+  monthNavButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DDE4EA",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  monthNavButtonDisabled: {
+    borderColor: "#EEF2F6",
+    backgroundColor: "#F7F9FB",
   },
   summaryLabel: {
     color: "#7C8793",

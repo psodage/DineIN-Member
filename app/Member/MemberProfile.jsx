@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  RefreshControl,
   FlatList,
   TouchableOpacity,
   Animated,
@@ -13,7 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Svg, { Circle, Defs, LinearGradient, Stop } from "react-native-svg";
+import Svg, { Circle } from "react-native-svg";
 import { useAuth } from "../../lib/AuthContext";
 import { useLanguage } from "../../LanguageContext";
 import api from "../../lib/api";
@@ -28,6 +29,7 @@ const MemberProfile = ({ embedded = false, mode = "profile" }) => {
   const { language } = useLanguage();
   const [member, setMember] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -166,8 +168,7 @@ const MemberProfile = ({ embedded = false, mode = "profile" }) => {
   const settingsItems = [
     { key: "edit", title: "Edit Profile", icon: "person-outline" },
     { key: "password", title: "Change Password", icon: "lock-closed-outline" },
-    { key: "privacy", title: "Privacy Policy", icon: "shield-checkmark-outline" },
-    { key: "support", title: "Help & Support", icon: "help-circle-outline" },
+    
   ];
 
   const navItems = [
@@ -214,6 +215,16 @@ const MemberProfile = ({ embedded = false, mode = "profile" }) => {
     }
   };
 
+  const handleSettingPress = (key) => {
+    if (key === "edit") {
+      router.push("/Member/MemberEditProfile");
+      return;
+    }
+    if (key === "password") {
+      router.push("/Member/MemberChangePasswordScreen");
+    }
+  };
+
   const content = (
     <ScrollView
       style={styles.profileScreen}
@@ -222,6 +233,20 @@ const MemberProfile = ({ embedded = false, mode = "profile" }) => {
         !embedded && styles.profileScrollContentStandalone,
       ]}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={async () => {
+            try {
+              setRefreshing(true);
+              await fetchMemberProfile();
+            } finally {
+              setRefreshing(false);
+            }
+          }}
+          tintColor={COLORS.primaryTeal}
+        />
+      }
     >
       {!billingOnly && (
         <View style={styles.heroCard}>
@@ -238,28 +263,14 @@ const MemberProfile = ({ embedded = false, mode = "profile" }) => {
             <Ionicons name="cafe-outline" size={30} color={COLORS.headerPattern} />
           </View>
 
-          <View style={styles.heroTopActions}>
-            <View style={styles.heroTopSpacer} />
-            <View style={styles.heroActionGroup}>
-              <TouchableOpacity style={styles.heroActionButton} activeOpacity={0.85}>
-                <Ionicons name="notifications-outline" size={20} color={COLORS.textNavy} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.heroActionButton}
-                activeOpacity={0.85}
-                onPress={handleLogout}
-              >
-                <Ionicons name="log-out-outline" size={20} color={COLORS.textNavy} />
-              </TouchableOpacity>
-            </View>
-          </View>
+          
 
           <View style={styles.heroProfileRow}>
             <View style={styles.heroAvatarShell}>
               <AvatarGradient size={88} />
             </View>
             <View style={styles.heroContent}>
-              <Text style={styles.heroWelcomeText}>Welcome Back!</Text>
+              
               <Text style={styles.heroMemberName}>{memberName}</Text>
               <View style={styles.heroStatusPill}>
                 <View style={styles.heroStatusDot} />
@@ -329,7 +340,7 @@ const MemberProfile = ({ embedded = false, mode = "profile" }) => {
           />
         </View>
 
-        <View style={styles.premiumProfileCard}>
+        <View style={[styles.premiumProfileCard, styles.accountSettingsCard]}>
           <SectionHeaderBlock
             iconName="settings-outline"
             iconColor={COLORS.primaryTeal}
@@ -343,6 +354,7 @@ const MemberProfile = ({ embedded = false, mode = "profile" }) => {
                 key={item.key}
                 style={styles.settingMiniCard}
                 activeOpacity={0.85}
+                onPress={() => handleSettingPress(item.key)}
               >
                 <View style={styles.settingMiniTopRow}>
                   <View style={styles.settingMiniIconBox}>
@@ -356,48 +368,9 @@ const MemberProfile = ({ embedded = false, mode = "profile" }) => {
           </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.logoutActionCard}
-          activeOpacity={0.88}
-          onPress={handleLogout}
-        >
-          <View style={styles.logoutActionLeft}>
-            <View style={styles.logoutActionIconBox}>
-              <Ionicons name="log-out-outline" size={20} color="#E46B5D" />
-            </View>
-            <Text style={styles.logoutActionText}>Logout</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#D28981" />
-        </TouchableOpacity>
+      
 
-        <View style={styles.profileSummaryCard}>
-          <SectionHeaderBlock
-            iconName="wallet-outline"
-            iconColor="#D97706"
-            iconBg="#FFF3E6"
-            title="Billing Snapshot"
-            subtitle="Quick summary of your current dues"
-          />
-          <PremiumInfoRow icon="wallet-outline" label="Total Mess Fee" value={totalMessFee} />
-          <PremiumInfoRow
-            icon="cash-outline"
-            label="Due Amount"
-            value={dueStatus ? <StatusWithValue badge={dueStatus} value={dueAmount} /> : dueAmount}
-          />
-          <View style={styles.progressBlock}>
-            <View style={styles.progressLabelRow}>
-              <Text style={styles.progressLabel}>Payment Status</Text>
-              <Text style={styles.progressPercent}>{percentPaid}% Paid</Text>
-            </View>
-            <ProgressBar ratio={paymentProgressRatio} />
-          </View>
-          <View style={styles.summaryInlineRow}>
-            <Text style={styles.summaryInlineLabel}>Combined Due Months</Text>
-            <Text style={styles.summaryInlineValue}>
-              ₹{Number(combinedDueMonthsTotalBill || 0).toLocaleString("en-IN")}
-            </Text>
-          </View>
-        </View>
+        
       </View>
     </ScrollView>
   );
@@ -573,7 +546,14 @@ function PremiumInfoRow({ icon, label, value, last = false }) {
           {value}
         </Text>
       ) : (
-        <View style={styles.premiumInfoCustomValue}>{value}</View>
+        <View
+          style={[
+            styles.premiumInfoCustomValue,
+            label === "Meal Plan" && styles.premiumInfoCustomValueMealPlan,
+          ]}
+        >
+          {value}
+        </View>
       )}
     </View>
   );
@@ -614,16 +594,10 @@ function AvatarGradient({ size = 76 }) {
       ]}
     >
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <Defs>
-          <LinearGradient id="avatarGradient" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor={COLORS.indigo} stopOpacity="1" />
-            <Stop offset="1" stopColor={COLORS.teal} stopOpacity="1" />
-          </LinearGradient>
-        </Defs>
-        <Circle cx={r} cy={r} r={r} fill="url(#avatarGradient)" />
+        <Circle cx={r} cy={r} r={r} fill="#FFFFFF" />
       </Svg>
       <View style={styles.avatarInner}>
-        <Ionicons name="person" size={30} color="#FFFFFF" />
+        <Ionicons name="person" size={30} color={COLORS.primaryTeal} />
       </View>
     </View>
   );
@@ -697,9 +671,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.bgPremium,
+    marginTop: -35,
+    
   },
 
   profileScreen: {
+
     flex: 1,
     backgroundColor: COLORS.bgPremium,
   },
@@ -713,12 +690,13 @@ const styles = StyleSheet.create({
   },
 
   heroCard: {
+    
     backgroundColor: COLORS.primaryTeal,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
     paddingTop: 10,
     paddingHorizontal: 18,
-    paddingBottom: 28,
+    paddingBottom: 120,
     overflow: "hidden",
   },
 
@@ -800,6 +778,7 @@ const styles = StyleSheet.create({
   heroContent: {
     flex: 1,
     marginLeft: 16,
+    marginTop:20,
   },
 
   heroWelcomeText: {
@@ -856,7 +835,8 @@ const styles = StyleSheet.create({
 
   profileCardsWrap: {
     paddingHorizontal: 14,
-    paddingTop: 12,
+    paddingTop: 12, 
+    marginTop:-100,
   },
 
   premiumProfileCard: {
@@ -869,6 +849,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.07,
     shadowRadius: 16,
     elevation: 3,
+  },
+  accountSettingsCard: {
+    paddingBottom:40,
   },
 
   premiumInfoRow: {
@@ -919,6 +902,9 @@ const styles = StyleSheet.create({
   premiumInfoCustomValue: {
     alignItems: "flex-end",
     maxWidth: "58%",
+  },
+  premiumInfoCustomValueMealPlan: {
+    maxWidth: "72%",
   },
 
   settingsGrid: {
@@ -1293,7 +1279,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    maxWidth: "60%",
+    maxWidth: "100%",
   },
 
   pillBadgeText: {

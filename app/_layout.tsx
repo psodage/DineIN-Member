@@ -5,7 +5,6 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LanguageProvider } from "../LanguageContext";
 import { AuthProvider } from "../lib/AuthContext";
 import AppSecurityWrapper from "../components/AppSecurityWrapper";
-import LogoScreenTransition from "../components/LogoScreenTransition";
 
 const DEFAULT_FONT = "Gilroy-Regular";
 
@@ -34,7 +33,6 @@ export default function RootLayout() {
                   animation: "slide_from_right",
                 }}
               />
-              <LogoScreenTransition />
             </View>
           </AppSecurityWrapper>
         </LanguageProvider>

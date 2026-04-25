@@ -32,20 +32,25 @@ const SnackOrderPage = ({ embedded = false }) => {
   const getSnackKey = (snack) => String(snack?._id || snack?.id || "");
 
   const getSnackStock = (snack) => {
-    // `SnackProduct.quantity` is stock/available units.
-    // Some dummy items may not have it; treat missing as unlimited.
-    const stock = Number(snack?.quantity);
+    // Prefer product quantity; fall back to common stock aliases seen in legacy payloads.
+    const rawStock =
+      snack?.quantity ??
+      snack?.availableQuantity ??
+      snack?.stock ??
+      snack?.inStock;
+    const stock = Number(rawStock);
     if (!Number.isFinite(stock)) return Number.POSITIVE_INFINITY;
     if (snack?.availability === false) return 0;
-    return Math.max(0, stock);
+    return Math.max(0, Math.floor(stock));
   };
 
-  const getSnackAvailableLabel = (snack) => {
+  const getSnackAvailableLabel = (snack, selectedQty = 0) => {
     const availability = snack?.availability !== false;
     if (!availability) return "0";
-    const stock = Number(snack?.quantity);
+    const stock = getSnackStock(snack);
     if (!Number.isFinite(stock)) return "Unlimited";
-    return String(Math.max(0, stock));
+    const remaining = Math.max(0, stock - Math.max(0, Number(selectedQty) || 0));
+    return String(remaining);
   };
 
   const loadStudentContext = useCallback(async () => {
@@ -268,8 +273,8 @@ const SnackOrderPage = ({ embedded = false }) => {
           <View style={styles.thumbnailWrap}>
             <Ionicons name="fast-food-outline" size={34} color="#0F8F88" />
             <View style={styles.availableBadge}>
-              <Text style={styles.availableBadgeText} numberOfLines={1}>
-                Available: {getSnackAvailableLabel(item)}
+              <Text style={styles.availableBadgeText}>
+                Qty: {getSnackAvailableLabel(item, quantity)}
               </Text>
             </View>
           </View>
@@ -582,7 +587,7 @@ const styles = StyleSheet.create({
     bottom: 6,
     left: 6,
     right: 6,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 999,
     backgroundColor: "#BBF7D0",
@@ -590,7 +595,7 @@ const styles = StyleSheet.create({
   },
   availableBadgeText: {
     color: "#166534",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "800",
     textAlign: "center",
   },

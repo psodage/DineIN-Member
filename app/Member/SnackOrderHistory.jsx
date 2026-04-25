@@ -5,9 +5,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator,
   Alert,
   Image,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,6 +23,7 @@ const SnackOrderHistory = () => {
   const [memberName, setMemberName] = useState("");
   const [orderHistory, setOrderHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
   const getDisplayTotal = (item) => {
@@ -314,6 +315,13 @@ const SnackOrderHistory = () => {
     fetchOrderHistory();
   };
 
+  const handleRefresh = useCallback(async () => {
+    if (!studentId || loading) return;
+    setRefreshing(true);
+    await fetchOrderHistory();
+    setRefreshing(false);
+  }, [fetchOrderHistory, loading, studentId]);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.headerBackground}>
@@ -346,7 +354,10 @@ const SnackOrderHistory = () => {
           >
             <Ionicons name="arrow-back" size={20} color="#0F8F88" />
           </TouchableOpacity>
-         
+          <TouchableOpacity style={styles.headerPill} onPress={handleRefresh} activeOpacity={0.85}>
+            <Ionicons name="refresh-outline" size={14} color="#0F8F88" />
+            <Text style={styles.headerPillText}>Refresh</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.title}>Order History</Text>
@@ -382,6 +393,13 @@ const SnackOrderHistory = () => {
             renderItem={renderRow}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor="#0F8F88"
+              />
+            }
             ListHeaderComponent={
               <View style={styles.sectionHeaderCard}>
                 <View>

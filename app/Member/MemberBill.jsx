@@ -1,5 +1,12 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -100,6 +107,7 @@ const MemberBill = ({ embedded = false }) => {
   const [selectedMonthKey, setSelectedMonthKey] = useState("");
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isMonthLoading, setIsMonthLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [payments, setPayments] = useState([]);
   const [monthlyDueHistory, setMonthlyDueHistory] = useState([]);
   const [lifetimeBreakdown, setLifetimeBreakdown] = useState({
@@ -195,7 +203,6 @@ const MemberBill = ({ embedded = false }) => {
       const totals = monthSummaries.reduce(
         (acc, row) => {
           if (!row) return acc;
-          acc.mealAmount += Number(row?.mealAmount || 0);
           acc.snacksAmount += Number(row?.snacksAmount || 0);
           acc.expenseShare += Number(row?.expenseShare || 0);
           acc.leaveDeduction += Number(row?.leaveDeduction || 0);
@@ -204,9 +211,14 @@ const MemberBill = ({ embedded = false }) => {
         { mealAmount: 0, snacksAmount: 0, expenseShare: 0, leaveDeduction: 0 }
       );
 
+      const mealDueAndCollectedTotal = monthlyDueHistory.reduce(
+        (sum, row) => sum + Number(row?.due || 0) + Number(row?.collected || 0),
+        0
+      );
+      totals.mealAmount = mealDueAndCollectedTotal;
+
       const finalTotal =
-        Number(totals.mealAmount || 0) +
-        Number(totals.snacksAmount || 0) +
+        Number(mealDueAndCollectedTotal || 0) +
         Number(totals.expenseShare || 0) -
         Number(totals.leaveDeduction || 0);
 
@@ -376,6 +388,48 @@ const MemberBill = ({ embedded = false }) => {
     setSelectedMonthKey(availableMonthKeys[nextIndex]);
   };
 
+  const onRefresh = useCallback(async () => {
+    if (!memberId) return;
+    try {
+      setRefreshing(true);
+      const [currentRes, historyRes, paymentsRes] = await Promise.all([
+        api.get(`/api/member-monthly-due/${memberId}/current`),
+        api.get(`/api/member-monthly-due/${memberId}/history?all=true`),
+        api.get(`/api/payments/${memberId}`),
+      ]);
+
+      const currentSummary = currentRes?.data || null;
+      const historyRows = Array.isArray(historyRes?.data) ? historyRes.data : [];
+      const paymentRows = Array.isArray(paymentsRes?.data) ? paymentsRes.data : [];
+      const resolvedMonthKey = selectedMonthKey || monthKeyLocal(currentSummary?.month);
+
+      setActiveMonthSummary(currentSummary);
+      setMonthlyDueHistory(historyRows);
+      setPayments(paymentRows);
+      if (resolvedMonthKey) {
+        setSelectedMonthKey(resolvedMonthKey);
+      }
+
+      if (resolvedMonthKey) {
+        try {
+          const selectedRes = await api.get(
+            `/api/member-monthly-due/${memberId}?month=${resolvedMonthKey}`
+          );
+          setMonthSummary(selectedRes?.data || currentSummary);
+        } catch (e) {
+          console.error("Member bill refresh selected month summary fetch error:", e);
+          setMonthSummary(currentSummary);
+        }
+      } else {
+        setMonthSummary(currentSummary);
+      }
+    } catch (e) {
+      console.error("Member bill refresh error:", e);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [memberId, selectedMonthKey]);
+
   const previousBillsData = useMemo(() => {
     const targetMonthKey = monthSummary?.month ? monthKeyLocal(monthSummary.month) : "";
     const rows = monthlyDueHistory
@@ -396,11 +450,12 @@ const MemberBill = ({ embedded = false }) => {
   }, [monthlyDueHistory, monthSummary?.month]);
 
   const chargesData = useMemo(() => {
-    const mealAmount = monthlyDueHistory.reduce(
+    const mealDueAndCollectedTotal = monthlyDueHistory.reduce(
       (sum, row) => sum + Number(row?.due || 0) + Number(row?.collected || 0),
       0
     );
     const snacksAmount = Number(lifetimeBreakdown?.snacksAmount || 0);
+    const mealAmount = mealDueAndCollectedTotal - snacksAmount;
     const expenseShare = Number(lifetimeBreakdown?.expenseShare || 0);
     const leaveDeduction = Number(lifetimeBreakdown?.leaveDeduction || 0);
     const totalAmount = Number(lifetimeBreakdown?.finalTotal || 0);
@@ -453,6 +508,13 @@ const MemberBill = ({ embedded = false }) => {
         !embedded && styles.billScrollContentStandalone,
       ]}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={COLORS.primaryTeal}
+        />
+      }
     >
       <View style={styles.billHeroHeader}>
         <View style={styles.billPatternWrap}>
@@ -700,18 +762,19 @@ const styles = StyleSheet.create({
     height: 38,
   },
   historyPillButton: {
+    marginTop:20,
     backgroundColor: "#FFFFFF",
     borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 8,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
   historyPillText: {
-    color: "#0F4E49",
+    color: COLORS.primaryTeal,
     fontWeight: "700",
-    fontSize: 11,
+    fontSize: 12,
   },
   billHeroTitle: {
     marginTop: 18,

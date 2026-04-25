@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert } from "react-native";
 import { router } from "expo-router";
-import { setAuthToken, setOnAuthError } from "./api";
+import { setAuthToken, setOnAuthError, suppressAuthErrorFor } from "./api";
 import api from "./api";
 
 /** Ensure member screens can rely on `user.id` (some stored payloads only had `_id`). */
@@ -86,9 +86,13 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
+      // Suppress global 401 alert while user explicitly logs out.
+      suppressAuthErrorFor(4000);
       // Best-effort server-side logout (clears activeSessionToken).
       if (token) {
-        await api.post("/api/auth/member-logout");
+        await api.post("/api/auth/member-logout", null, {
+          skipAuthErrorHandling: true,
+        });
       }
     } catch (_) {
       // ignore

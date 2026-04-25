@@ -491,7 +491,7 @@ const MemberDashboard = () => {
             <Ionicons name="person" size={32} color={PRIMARY} />
           </View>
           <View>
-            <Text style={styles.welcomeText}>Welcome Back</Text>
+            <Text style={styles.welcomeText}>Welcome Back,</Text>
             <Text style={styles.memberName}>{memberName}</Text>
             <View style={styles.motivationalPill}>
              
@@ -794,6 +794,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     marginLeft: 12,
+    marginTop: -20,
   },
   headerActionButton: {
     

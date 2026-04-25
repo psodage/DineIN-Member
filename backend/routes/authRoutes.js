@@ -349,6 +349,40 @@ router.post("/member-reset-password", async (req, res) => {
   }
 });
 
+/**
+ * POST /member-change-password
+ * Authenticated member password change using current password.
+ */
+router.post("/member-change-password", authenticate, requireMember, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        message: "Current password and new password are required",
+      });
+    }
+
+    const memberUser = await User.findOne({ _id: req.user.id, role: "member" });
+    if (!memberUser) {
+      return res.status(404).json({ message: "Member not found" });
+    }
+
+    const isMatch = await bcrypt.compare(String(currentPassword), memberUser.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Current password is incorrect" });
+    }
+
+    memberUser.password = await bcrypt.hash(String(newPassword), 10);
+    await memberUser.save();
+
+    return res.status(200).json({ message: "Password changed successfully" });
+  } catch (error) {
+    console.error("Member change password error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
 // Admin login
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;

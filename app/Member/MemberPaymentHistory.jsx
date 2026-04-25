@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -67,7 +68,9 @@ const MemberPaymentHistory = () => {
   const memberId = user?.id || user?._id;
 
   const [payments, setPayments] = useState([]);
+  const [monthlyDueHistory, setMonthlyDueHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
   const fetchPayments = useCallback(async () => {
@@ -81,12 +84,18 @@ const MemberPaymentHistory = () => {
     try {
       setLoading(true);
       setError("");
-      const res = await api.get(`/api/payments/${memberId}`);
-      const rows = Array.isArray(res?.data) ? res.data : [];
-      setPayments(rows);
+      const [paymentsRes, historyRes] = await Promise.all([
+        api.get(`/api/payments/${memberId}`),
+        api.get(`/api/member-monthly-due/${memberId}/history?all=true`),
+      ]);
+      const paymentRows = Array.isArray(paymentsRes?.data) ? paymentsRes.data : [];
+      const historyRows = Array.isArray(historyRes?.data) ? historyRes.data : [];
+      setPayments(paymentRows);
+      setMonthlyDueHistory(historyRows);
     } catch (e) {
       console.error("Member payment history fetch error:", e);
       setPayments([]);
+      setMonthlyDueHistory([]);
       setError("Failed to load payment history.");
     } finally {
       setLoading(false);
@@ -97,14 +106,24 @@ const MemberPaymentHistory = () => {
     fetchPayments();
   }, [fetchPayments]);
 
+  const onRefresh = useCallback(async () => {
+    if (loading) return;
+    setRefreshing(true);
+    await fetchPayments();
+    setRefreshing(false);
+  }, [fetchPayments, loading]);
+
   const summary = useMemo(() => {
     const totalPaid = payments.reduce((sum, row) => sum + Number(row?.paidAmount || 0), 0);
     const totalBill = payments.reduce((sum, row) => sum + Number(row?.totalBill || 0), 0);
-    const totalDue = payments.reduce((sum, row) => sum + Number(row?.remainingAmount || 0), 0);
+    const totalDue = monthlyDueHistory.reduce(
+      (sum, row) => sum + Number(row?.due || 0) + Number(row?.collected || 0),
+      0
+    );
     const paymentCount = payments.length;
 
     return { totalPaid, totalBill, totalDue, paymentCount };
-  }, [payments]);
+  }, [payments, monthlyDueHistory]);
 
   const recentPayments = useMemo(() => payments.slice(0, 100), [payments]);
 
@@ -181,6 +200,13 @@ const MemberPaymentHistory = () => {
         style={styles.screen}
         contentContainerStyle={styles.screenContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primaryTeal}
+          />
+        }
       >
         <View style={styles.heroHeader}>
           <View style={styles.patternWrap}>
@@ -196,10 +222,7 @@ const MemberPaymentHistory = () => {
             >
               <Ionicons name="arrow-back" size={20} color="#0F4E49" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.refreshPill} onPress={fetchPayments} activeOpacity={0.85}>
-              <Ionicons name="refresh-outline" size={14} color="#0F4E49" />
-              <Text style={styles.refreshPillText}>Refresh</Text>
-            </TouchableOpacity>
+  
           </View>
           <Text style={styles.heroTitle}>Payment History</Text>
           <Text style={styles.heroSubtitle}>Track all your monthly payments</Text>
@@ -274,9 +297,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   roundButton: {
+    marginTop:20,
     width: 38,
     height: 38,
-    borderRadius: 19,
+    borderRadius: 12,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",

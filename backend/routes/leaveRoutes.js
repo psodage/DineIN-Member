@@ -148,11 +148,72 @@ router.get(
       const { memberId } = req.params;
       const limit = Math.max(1, Math.min(200, Number(req.query?.limit || 100)));
       const rows = await LeaveRequest.find({ memberId, type: "Leave" })
-        .select("startDate endDate status reason reasonMr createdAt updatedAt")
+        .select(
+          "startDate endDate status reason reasonMr createdAt updatedAt billingApplied billingDaysTotal billingDaysByMonth"
+        )
         .sort({ createdAt: -1 })
         .limit(limit)
         .lean();
-      return res.json(rows);
+
+      const summary = rows.reduce(
+        (acc, row) => {
+          acc.total += 1;
+          const st = String(row?.status || "").trim().toLowerCase();
+          if (st === "approved") acc.approved += 1;
+          else if (st === "rejected") acc.rejected += 1;
+          else acc.pending += 1;
+          return acc;
+        },
+        { total: 0, approved: 0, pending: 0, rejected: 0 }
+      );
+
+      // Enrich each row with the LeaveStat month periods it impacts.
+      // LeaveStat stores `month` (first day of month). We'll compute end-of-month in backend.
+      const monthStarts = new Set();
+      for (const row of rows) {
+        const byMonth = Array.isArray(row?.billingDaysByMonth) ? row.billingDaysByMonth : [];
+        for (const seg of byMonth) {
+          if (!seg?.month) continue;
+          const m = new Date(seg.month);
+          if (!Number.isNaN(m.getTime())) monthStarts.add(new Date(m.getFullYear(), m.getMonth(), 1).toISOString());
+        }
+      }
+
+      const monthStartDates = Array.from(monthStarts).map((s) => new Date(s));
+      const leaveStats = monthStartDates.length
+        ? await LeaveStat.find({ memberId, month: { $in: monthStartDates } })
+            .select("month inactiveDays")
+            .lean()
+        : [];
+      const statMap = new Map(
+        leaveStats.map((s) => [new Date(s.month).toISOString(), Number(s?.inactiveDays || 0)])
+      );
+
+      const enrichedRows = rows.map((row) => {
+        const byMonth = Array.isArray(row?.billingDaysByMonth) ? row.billingDaysByMonth : [];
+        const leaveStatPeriods = byMonth
+          .map((seg) => {
+            const m = seg?.month ? new Date(seg.month) : null;
+            if (!m || Number.isNaN(m.getTime())) return null;
+            const monthStart = new Date(m.getFullYear(), m.getMonth(), 1);
+            const monthEnd = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+            const key = monthStart.toISOString();
+            return {
+              monthStart,
+              monthEnd,
+              inactiveDays: statMap.get(key) || 0,
+              daysApplied: Number(seg?.days || 0),
+            };
+          })
+          .filter(Boolean);
+
+        return {
+          ...row,
+          leaveStatPeriods,
+        };
+      });
+
+      return res.json({ summary, rows: enrichedRows });
     } catch (error) {
       console.error("Get member leave history error:", error);
       return res.status(500).json({ message: "Failed to fetch leave history" });

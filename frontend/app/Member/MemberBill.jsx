@@ -211,16 +211,14 @@ const MemberBill = ({ embedded = false }) => {
         { mealAmount: 0, snacksAmount: 0, expenseShare: 0, leaveDeduction: 0 }
       );
 
-      const mealDueAndCollectedTotal = monthlyDueHistory.reduce(
-        (sum, row) => sum + Number(row?.due || 0) + Number(row?.collected || 0),
+      const mealDueTotal = monthlyDueHistory.reduce(
+        (sum, row) => sum + Number(row?.due || 0),
         0
       );
-      totals.mealAmount = mealDueAndCollectedTotal;
+      totals.mealAmount = mealDueTotal;
 
       const finalTotal =
-        Number(mealDueAndCollectedTotal || 0) +
-        Number(totals.expenseShare || 0) -
-        Number(totals.leaveDeduction || 0);
+        Number(mealDueTotal || 0) + Number(totals.expenseShare || 0);
 
       if (!cancelled) {
         setLifetimeBreakdown({
@@ -300,6 +298,7 @@ const MemberBill = ({ embedded = false }) => {
     const totalAmount = Number(monthSummary?.totalBill || 0);
     const paidAmount = Number(monthSummary?.paidAmount || 0);
     const remainingAmount = Number(monthSummary?.remainingAmount ?? monthSummary?.monthlyDue ?? 0);
+    const effectiveDue = remainingAmount < 0 ? remainingAmount : Math.max(0, remainingAmount);
 
     const statusRaw = String(monthSummary?.monthlyStatus || "").trim();
     const status =
@@ -314,17 +313,24 @@ const MemberBill = ({ embedded = false }) => {
       month: monthSummary?.month ? formatMonthLabel(monthSummary.month) : formatMonthLabel(new Date()),
       totalAmount,
       paidAmount,
-      dueAmount: Math.max(0, remainingAmount),
+      // keep raw sign for status/progress decisions; UI display clamps separately where needed
+      dueAmount: effectiveDue,
       status,
     };
   }, [monthSummary]);
 
   const paidRatio = useMemo(() => {
-    const total = Number(premiumSummary.totalAmount || 0);
     const paid = Number(premiumSummary.paidAmount || 0);
-    if (total <= 0) return 0;
-    return Math.max(0, Math.min(1, paid / total));
-  }, [premiumSummary.totalAmount, premiumSummary.paidAmount]);
+    const due = Number(premiumSummary.dueAmount || 0);
+
+    // If due is negative, treat it as fully paid (overpaid).
+    if (due < 0) return 1;
+
+    // Scale the bar based on paid vs due (paid / (paid + due)).
+    const totalForProgress = Math.max(0, paid) + Math.max(0, due);
+    if (totalForProgress <= 0) return 0;
+    return Math.max(0, Math.min(1, Math.max(0, paid) / totalForProgress));
+  }, [premiumSummary.paidAmount, premiumSummary.dueAmount]);
 
   const dueRatio = 1 - paidRatio;
 
@@ -335,6 +341,30 @@ const MemberBill = ({ embedded = false }) => {
   const totalDueAllMonths = useMemo(() => {
     return monthlyDueHistory.reduce((sum, row) => sum + Number(row?.due || 0), 0);
   }, [monthlyDueHistory]);
+
+  const netDueAllMonths = useMemo(() => {
+    return monthlyDueHistory.reduce((sum, row) => {
+      const due = Number(row?.due || 0);
+      const collected = Number(row?.collected || 0);
+      return sum + Math.max(0, due - collected);
+    }, 0);
+  }, [monthlyDueHistory]);
+
+  const headerStatus = useMemo(() => {
+    // Align status with the "Due Amount" value shown in the header.
+    if (netDueAllMonths <= 0) return "Paid";
+    return Number(premiumSummary.paidAmount || 0) > 0 ? "Partial" : "Pending";
+  }, [netDueAllMonths, premiumSummary.paidAmount]);
+
+  const headerPaidRatio = useMemo(() => {
+    // Align progress bar with the "Due Amount" shown in the header.
+    if (netDueAllMonths <= 0) return 1;
+    const paid = Math.max(0, Number(premiumSummary.paidAmount || 0));
+    const due = Math.max(0, Number(netDueAllMonths || 0));
+    const total = paid + due;
+    if (!total) return 0;
+    return Math.max(0, Math.min(1, paid / total));
+  }, [netDueAllMonths, premiumSummary.paidAmount]);
 
   const paymentHistoryData = useMemo(() => {
     const targetMonthKey = monthSummary?.month ? monthKeyLocal(monthSummary.month) : "";
@@ -450,12 +480,12 @@ const MemberBill = ({ embedded = false }) => {
   }, [monthlyDueHistory, monthSummary?.month]);
 
   const chargesData = useMemo(() => {
-    const mealDueAndCollectedTotal = monthlyDueHistory.reduce(
-      (sum, row) => sum + Number(row?.due || 0) + Number(row?.collected || 0),
+    const snacksAmount = Number(lifetimeBreakdown?.snacksAmount || 0);
+    const mealDueTotal = monthlyDueHistory.reduce(
+      (sum, row) => sum + Number(row?.due || 0),
       0
     );
-    const snacksAmount = Number(lifetimeBreakdown?.snacksAmount || 0);
-    const mealAmount = mealDueAndCollectedTotal - snacksAmount;
+    const mealAmount = mealDueTotal;
     const expenseShare = Number(lifetimeBreakdown?.expenseShare || 0);
     const leaveDeduction = Number(lifetimeBreakdown?.leaveDeduction || 0);
     const totalAmount = Number(lifetimeBreakdown?.finalTotal || 0);
@@ -593,23 +623,37 @@ const MemberBill = ({ embedded = false }) => {
           <View style={styles.summaryCol}>
             <Text style={styles.summaryLabel}>Due Amount</Text>
             <Text style={styles.summaryRedAmount}>
-              ₹{totalDueAllMonths.toLocaleString("en-IN")}
+              ₹{netDueAllMonths.toLocaleString("en-IN")}
             </Text>
           </View>
           <View style={styles.summaryColDivider} />
           <View style={styles.summaryCol}>
             <Text style={styles.summaryLabel}>Status</Text>
-            <View style={styles.partialBadge}>
-              <Text style={styles.partialBadgeText}>{premiumSummary.status}</Text>
+            <View
+              style={[
+                styles.partialBadge,
+                headerStatus === "Paid" ? styles.paidBadge : null,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.partialBadgeText,
+                  headerStatus === "Paid" ? styles.paidBadgeText : null,
+                ]}
+              >
+                {headerStatus}
+              </Text>
             </View>
           </View>
         </View>
         <View style={styles.summaryProgressTrack}>
-          <View style={[styles.summaryProgressFill, { width: `${paidRatio * 100}%` }]} />
+          <View style={[styles.summaryProgressFill, { width: `${headerPaidRatio * 100}%` }]} />
         </View>
         <View style={styles.summaryProgressMetaRow}>
-          <Text style={styles.summaryProgressPaid}>{Math.round(paidRatio * 100)}% Paid</Text>
-          <Text style={styles.summaryProgressDue}>{Math.round(dueRatio * 100)}% Due</Text>
+          <Text style={styles.summaryProgressPaid}>{Math.round(headerPaidRatio * 100)}% Paid</Text>
+          <Text style={styles.summaryProgressDue}>
+            {Math.round((1 - headerPaidRatio) * 100)}% Due
+          </Text>
         </View>
       </View>
 
@@ -879,10 +923,16 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     backgroundColor: "#FFE9EC",
   },
+  paidBadge: {
+    backgroundColor: "#E6F8EF",
+  },
   partialBadgeText: {
     color: COLORS.redAccent,
     fontSize: 11,
     fontWeight: "800",
+  },
+  paidBadgeText: {
+    color: COLORS.greenAccent,
   },
   summaryProgressTrack: {
     marginTop: 12,

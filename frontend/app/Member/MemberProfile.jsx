@@ -211,7 +211,7 @@ const MemberProfile = ({ embedded = false, mode = "profile" }) => {
       return;
     }
     if (tabKey === "leaves") {
-      router.push("/Member/ActivityCalendarScreen");
+      router.push("/Member/MemberLeave");
     }
   };
 

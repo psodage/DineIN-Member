@@ -90,7 +90,7 @@ export const AuthProvider = ({ children }) => {
       suppressAuthErrorFor(4000);
       // Best-effort server-side logout (clears activeSessionToken).
       if (token) {
-        await api.post("/api/auth/member-logout", null, {
+        await api.post("/api/auth/member-logout", {}, {
           skipAuthErrorHandling: true,
         });
       }

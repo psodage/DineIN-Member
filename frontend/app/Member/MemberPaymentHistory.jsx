@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -49,17 +48,6 @@ function formatPaymentDate(dateLike) {
     month: "short",
     year: "numeric",
   });
-}
-
-function statusStyles(status) {
-  const normalized = String(status || "Pending").toLowerCase();
-  if (normalized === "paid") {
-    return { bg: "#E8F8F0", text: COLORS.greenAccent };
-  }
-  if (normalized === "partial") {
-    return { bg: "#FFF4E8", text: COLORS.orangeAccent };
-  }
-  return { bg: "#FFE9EC", text: COLORS.redAccent };
 }
 
 const MemberPaymentHistory = () => {
@@ -116,10 +104,7 @@ const MemberPaymentHistory = () => {
   const summary = useMemo(() => {
     const totalPaid = payments.reduce((sum, row) => sum + Number(row?.paidAmount || 0), 0);
     const totalBill = payments.reduce((sum, row) => sum + Number(row?.totalBill || 0), 0);
-    const totalDue = monthlyDueHistory.reduce(
-      (sum, row) => sum + Number(row?.due || 0) + Number(row?.collected || 0),
-      0
-    );
+    const totalDue = monthlyDueHistory.reduce((sum, row) => sum + Number(row?.due || 0), 0);
     const paymentCount = payments.length;
 
     return { totalPaid, totalBill, totalDue, paymentCount };
@@ -132,10 +117,6 @@ const MemberPaymentHistory = () => {
     const method = String(item?.paymentMethod || "Cash");
     const month = formatMonthLabel(item?.month);
     const paidOn = formatPaymentDate(item?.date || item?.createdAt || item?.updatedAt);
-    const totalBill = Number(item?.totalBill || 0);
-    const due = Number(item?.remainingAmount || 0);
-    const status = String(item?.status || "Pending");
-    const statusStyle = statusStyles(status);
 
     return (
       <View style={styles.rowCard}>
@@ -151,21 +132,56 @@ const MemberPaymentHistory = () => {
 
         <View style={styles.rowBottom}>
           <Text style={styles.metaText}>Paid On: {paidOn || "-"}</Text>
-          <Text style={styles.metaText}>Total Bill: ₹{totalBill.toLocaleString("en-IN")}</Text>
-          <Text style={styles.metaText}>Remaining: ₹{due.toLocaleString("en-IN")}</Text>
-        </View>
-
-        <View style={styles.rowFooter}>
-          <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-            <Text style={[styles.statusText, { color: statusStyle.text }]}>{status}</Text>
-          </View>
-          <Text style={styles.metaTextLight}>Billing Month: {month || "-"}</Text>
+          <Text style={styles.metaText}>Billing Month: {month || "-"}</Text>
         </View>
       </View>
     );
   };
 
-  const listContent = (
+  const renderListHeader = () => (
+    <>
+      <View style={styles.heroHeader}>
+        <View style={styles.patternWrap}>
+          <Ionicons name="card-outline" size={36} color={COLORS.headerPattern} />
+          <Ionicons name="wallet-outline" size={36} color={COLORS.headerPattern} />
+          <Ionicons name="cash-outline" size={36} color={COLORS.headerPattern} />
+        </View>
+        <View style={styles.heroTopRow}>
+          <TouchableOpacity
+            style={styles.roundButton}
+            onPress={() => router.back()}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="arrow-back" size={20} color="#0F4E49" />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.heroTitle}>Payment History</Text>
+        <Text style={styles.heroSubtitle}>Track all your monthly payments</Text>
+      </View>
+
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryCol}>
+            <Text style={styles.summaryLabel}>Payments</Text>
+            <Text style={styles.summaryPrimary}>{summary.paymentCount}</Text>
+          </View>
+          <View style={styles.summaryDivider} />
+          <View style={styles.summaryCol}>
+            <Text style={styles.summaryLabel}>Total Paid</Text>
+            <Text style={styles.summaryTeal}>₹{summary.totalPaid.toLocaleString("en-IN")}</Text>
+          </View>
+          <View style={styles.summaryDivider} />
+          <View style={styles.summaryCol}>
+            <Text style={styles.summaryLabel}>Total Due</Text>
+            <Text style={styles.summaryRed}>₹{summary.totalDue.toLocaleString("en-IN")}</Text>
+          </View>
+        </View>
+        <Text style={styles.summaryBillText}>Total Billed: ₹{summary.totalBill.toLocaleString("en-IN")}</Text>
+      </View>
+    </>
+  );
+
+  const renderListEmpty = () => (
     <View style={styles.content}>
       {error ? (
         <View style={styles.centered}>
@@ -175,31 +191,28 @@ const MemberPaymentHistory = () => {
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
-      ) : recentPayments.length === 0 ? (
+      ) : (
         <View style={styles.centered}>
           <Ionicons name="time-outline" size={44} color={COLORS.mutedText} />
           <Text style={styles.emptyText}>No payments found yet.</Text>
         </View>
-      ) : (
-        <FlatList
-          data={recentPayments}
-          keyExtractor={(item, index) =>
-            String(item?._id || item?.id || `${item?.date || "payment"}-${index}`)
-          }
-          renderItem={renderItem}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-        />
       )}
     </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
+      <FlatList
         style={styles.screen}
-        contentContainerStyle={styles.screenContent}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        data={error ? [] : recentPayments}
+        keyExtractor={(item, index) =>
+          String(item?._id || item?.id || `${item?.date || "payment"}-${index}`)
+        }
+        renderItem={renderItem}
+        ListHeaderComponent={renderListHeader}
+        ListEmptyComponent={renderListEmpty}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -207,51 +220,7 @@ const MemberPaymentHistory = () => {
             tintColor={COLORS.primaryTeal}
           />
         }
-      >
-        <View style={styles.heroHeader}>
-          <View style={styles.patternWrap}>
-            <Ionicons name="card-outline" size={36} color={COLORS.headerPattern} />
-            <Ionicons name="wallet-outline" size={36} color={COLORS.headerPattern} />
-            <Ionicons name="cash-outline" size={36} color={COLORS.headerPattern} />
-          </View>
-          <View style={styles.heroTopRow}>
-            <TouchableOpacity
-              style={styles.roundButton}
-              onPress={() => router.back()}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="arrow-back" size={20} color="#0F4E49" />
-            </TouchableOpacity>
-  
-          </View>
-          <Text style={styles.heroTitle}>Payment History</Text>
-          <Text style={styles.heroSubtitle}>Track all your monthly payments</Text>
-        </View>
-
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryCol}>
-              <Text style={styles.summaryLabel}>Payments</Text>
-              <Text style={styles.summaryPrimary}>{summary.paymentCount}</Text>
-            </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryCol}>
-              <Text style={styles.summaryLabel}>Total Paid</Text>
-              <Text style={styles.summaryTeal}>₹{summary.totalPaid.toLocaleString("en-IN")}</Text>
-            </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryCol}>
-              <Text style={styles.summaryLabel}>Total Due</Text>
-              <Text style={styles.summaryRed}>₹{summary.totalDue.toLocaleString("en-IN")}</Text>
-            </View>
-          </View>
-          <Text style={styles.summaryBillText}>
-            Total Billed: ₹{summary.totalBill.toLocaleString("en-IN")}
-          </Text>
-        </View>
-
-        <View style={styles.listWrap}>{listContent}</View>
-      </ScrollView>
+      />
 
       <FullScreenLoading visible={loading} color={COLORS.primaryTeal} />
     </SafeAreaView>
@@ -269,9 +238,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.bgPremium,
   },
-  screenContent: {
+  listContent: {
     flexGrow: 1,
     paddingHorizontal: 16,
+    paddingTop: 14,
     paddingBottom: 24,
   },
   heroHeader: {
@@ -385,16 +355,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-  listWrap: {
-    marginTop: 14,
-    flex: 1,
-  },
   content: {
     flex: 1,
-    minHeight: 240,
-  },
-  listContent: {
-    paddingBottom: 26,
+    minHeight: 300,
+    marginTop: 14,
   },
   rowCard: {
     backgroundColor: COLORS.card,
@@ -443,29 +407,6 @@ const styles = StyleSheet.create({
   metaText: {
     color: COLORS.mutedText,
     fontSize: 13,
-    fontWeight: "600",
-  },
-  rowFooter: {
-    marginTop: 11,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#EEF2F6",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  statusBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: "800",
-  },
-  metaTextLight: {
-    color: "#8A97A8",
-    fontSize: 11,
     fontWeight: "600",
   },
   centered: {

@@ -13,7 +13,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../lib/AuthContext";
 import api from "../../lib/api";
-import ActivityCalendarScreen from "./ActivityCalendarScreen";
+import MemberLeave from "./MemberLeave";
 import MemberBill from "./MemberBill";
 import MemberProfile from "./MemberProfile";
 import MemberPollCard from "./MemberPollCard";
@@ -686,7 +686,7 @@ const MemberDashboard = () => {
   );
 
   const renderMiddleContent = () => {
-    if (activeTab === "leaves") return <ActivityCalendarScreen embedded />;
+    if (activeTab === "leaves") return <MemberLeave embedded />;
     if (activeTab === "profile") return <MemberProfile embedded />;
     if (activeTab === "snacks") return <SnackOrderPage embedded />;
     if (activeTab === "bill") return <MemberBill embedded />;

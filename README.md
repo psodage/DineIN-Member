@@ -7,6 +7,7 @@ Production monorepo for the DineIN member mobile app and API.
 ```
 DINEIN-MEMBER/
 ├── frontend/     # React Native (Expo) member app
+├── web/          # React PWA (Vite + Tailwind) — installable web app
 ├── backend/      # Node.js / Express API
 ├── README.md
 └── .gitignore
@@ -37,6 +38,20 @@ eas update --channel production --message "OTA update"
 ```
 
 Point `EXPO_PUBLIC_API_BASE_URL` at your backend (no trailing slash). EAS build profiles in `frontend/eas.json` set this for preview/production.
+
+## Web PWA (Vite)
+
+Installable member app for browsers (desktop, tablet, mobile):
+
+```bash
+cd web
+cp .env.example .env   # set VITE_API_BASE_URL
+npm install
+npm run dev            # http://localhost:5173
+npm run build          # output: web/dist
+```
+
+Deploy to Vercel with root directory `web`. See [web/README.md](web/README.md) for PWA install steps and full route map.
 
 ## Backend (Express)
 

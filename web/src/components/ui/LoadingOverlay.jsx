@@ -1,4 +1,4 @@
-export default function LoadingOverlay({ visible, color = "#0F8F88" }) {
+export default function LoadingOverlay({ visible, color = "#F97316" }) {
   if (!visible) return null;
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-white/70 backdrop-blur-sm">

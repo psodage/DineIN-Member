@@ -17,7 +17,7 @@ export default function SignupLayout({ children }) {
           </div>
         </div>
       </div>
-      <div className="relative z-20 -mt-8 min-h-[72.5vh] rounded-t-3xl bg-white px-6 pb-8 pt-5 shadow-2xl">
+      <div className="relative z-20 -mt-8 min-h-[73vh] rounded-t-3xl bg-white px-6 pb-8 pt-5 shadow-2xl">
         {children}
       </div>
     </div>

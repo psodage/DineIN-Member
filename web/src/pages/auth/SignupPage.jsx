@@ -95,25 +95,25 @@ export default function SignupPage() {
         </Link>
       </p>
 
-      <form onSubmit={handleSignup} className="mt-3.5 max-h-[80vh] space-y-2 overflow-y-auto pr-1">
-        <Input icon={User} placeholder="Full name" value={form.name} onChange={set("name")} />
-        <Input icon={User} placeholder="Room owner name" value={form.roomOwnerName} onChange={set("roomOwnerName")} />
-        <Input icon={Phone} placeholder="Phone" value={form.phone} onChange={set("phone")} />
-        <Input icon={Mail} type="email" placeholder="Email" value={form.email} onChange={set("email")} />
-        <Input icon={Lock} type="password" placeholder="Password" value={form.password} onChange={set("password")} />
-        <Input icon={Lock} type="password" placeholder="Confirm password" value={form.confirmPassword} onChange={set("confirmPassword")} />
+      <form onSubmit={handleSignup} className="mt-3.5 max-h-[80vh] space-y-1.5 overflow-y-auto pr-1">
+        <Input icon={User} placeholder="Full name" value={form.name} onChange={set("name")} className="!min-h-[44px] !rounded-xl text-sm" />
+        <Input icon={User} placeholder="Room owner name" value={form.roomOwnerName} onChange={set("roomOwnerName")} className="!min-h-[44px] !rounded-xl text-sm" />
+        <Input icon={Phone} placeholder="Phone" value={form.phone} onChange={set("phone")} className="!min-h-[44px] !rounded-xl text-sm" />
+        <Input icon={Mail} type="email" placeholder="Email" value={form.email} onChange={set("email")} className="!min-h-[44px] !rounded-xl text-sm" />
+        <Input icon={Lock} type="password" placeholder="Password" value={form.password} onChange={set("password")} className="!min-h-[44px] !rounded-xl text-sm" />
+        <Input icon={Lock} type="password" placeholder="Confirm password" value={form.confirmPassword} onChange={set("confirmPassword")} className="!min-h-[44px] !rounded-xl text-sm" />
 
         <div>
-          <p className="mb-2 text-sm font-semibold text-ink">Meal plan</p>
-          <div className="flex flex-wrap gap-2">
+          <p className="mb-1 text-xs font-semibold text-ink">Meal plan</p>
+          <div className="flex gap-2">
             {MEAL_PLANS.map((plan) => (
               <button
                 key={plan}
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, mealPlan: plan }))}
-                className={`rounded-full px-4 py-2 text-sm font-bold transition ${form.mealPlan === plan
-                    ? "bg-brand text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                className={`flex-1 py-1.5 text-xs font-bold border border-orange-500 rounded-xl transition-colors duration-200 ${form.mealPlan === plan
+                    ? "bg-orange-500 text-white"
+                    : "bg-white text-orange-500 hover:bg-orange-500 hover:text-white"
                   }`}
               >
                 {plan}
@@ -122,7 +122,7 @@ export default function SignupPage() {
           </div>
         </div>
 
-        <Button type="submit" variant="accent" className="w-full sticky bottom-0 mt-4" loading={loading}>
+        <Button type="submit" variant="accent" className="w-full sticky bottom-0 mt-3 !min-h-[44px] !rounded-xl text-sm" loading={loading}>
           Create account
         </Button>
       </form>

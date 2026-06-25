@@ -6,13 +6,13 @@ export default function AuthLayout({ children, headline }) {
         style={{ backgroundImage: "url(/img4.jpg)" }}
       >
         <div className="absolute inset-0 bg-black/30" />
-        <div className="relative z-10 px-5 pb-6 pt-10 safe-top">
-          <div className="flex items-center gap-3">
+        <div className="relative z-10 px-5 pb-6">
+          <div className="flex items-center gap-3 bg-white px-5 pb-3 shadow-md -mx-5 safe-top">
             <img src="/logo2.png" alt="DineIN" className="h-10 w-auto" />
-            <div className="h-10 w-px bg-white/90" />
+            <div className="h-10 w-px bg-slate-200" />
             <div>
-              <p className="text-sm font-extrabold text-white">DineIN</p>
-              <p className="text-[10px] text-white/90">Eat Smart. Live Easy.</p>
+              <p className="text-sm font-extrabold text-slate-800">DineIN</p>
+              <p className="text-[10px] text-slate-500">Eat Smart. Live Easy.</p>
             </div>
           </div>
           {headline ? (

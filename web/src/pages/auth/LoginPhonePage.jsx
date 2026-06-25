@@ -86,12 +86,26 @@ export default function LoginPhonePage() {
           </button>
         </label>
 
-        <label className="flex items-center gap-2 text-sm text-slate-600">
-          <input
-            type="checkbox"
-            checked={rememberMe}
-            onChange={(e) => setRememberMe(e.target.checked)}
-          />
+        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+          <div className="relative flex items-center justify-center">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="sr-only"
+            />
+            <div className={`h-[18px] w-[18px] rounded border-2 transition-all flex items-center justify-center ${
+              rememberMe
+                ? "border-orange-500 bg-orange-500 text-white"
+                : "border-slate-300 bg-white hover:border-slate-400"
+            }`}>
+              {rememberMe && (
+                <svg className="h-3 w-3 stroke-current stroke-[3.5px]" fill="none" viewBox="0 0 24 24">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
+            </div>
+          </div>
           Remember me
         </label>
 

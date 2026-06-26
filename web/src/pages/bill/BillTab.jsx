@@ -63,7 +63,7 @@ export default function BillTab() {
 
   return (
     <div className="min-h-dvh bg-white pb-16">
-      <header className="safe-top rounded-b-[26px] bg-brand px-5 pb-8 pt-4 text-white">
+      <header className="safe-top rounded-b-[26px] bg-accent px-5 pb-8 pt-4 text-white">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-extrabold">My Bill</h1>
@@ -80,7 +80,7 @@ export default function BillTab() {
           <p className="text-sm font-semibold text-muted">Total bill</p>
           <p className="mt-1 text-3xl font-extrabold text-ink">{formatCurrencyINR(premium.total)}</p>
           <div className="mt-4 h-2 overflow-hidden rounded-full bg-white">
-            <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${premium.pct}%` }} />
+            <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${premium.pct}%` }} />
           </div>
           <div className="mt-3 flex justify-between text-sm">
             <span className="font-semibold text-green-700">Paid {formatCurrencyINR(premium.paid)}</span>

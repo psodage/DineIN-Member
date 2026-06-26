@@ -43,16 +43,18 @@ export default function ChangePasswordPage() {
   };
 
   return (
-    <div className="min-h-dvh bg-surface">
+    <div className="min-h-dvh bg-white pb-6">
       <PageHeader title="Change password" backTo="/dashboard" />
-      <form onSubmit={handleSubmit} className="space-y-4 px-5 py-6">
-        <Input icon={Lock} type="password" placeholder="Current password" value={currentPassword} onChange={(e) => setCurrent(e.target.value)} />
-        <Input icon={Lock} type="password" placeholder={t("new_password_placeholder")} value={newPassword} onChange={(e) => setNew(e.target.value)} />
-        <Input icon={Lock} type="password" placeholder={t("confirm_new_password_placeholder")} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-        <Button type="submit" className="w-full" loading={loading}>
-          Save password
-        </Button>
-      </form>
+      <div className="px-4 py-4">
+        <form onSubmit={handleSubmit} className="rounded-2xl border border-slate-100 bg-surface p-5 space-y-4">
+          <Input icon={Lock} type="password" placeholder="Current password" value={currentPassword} onChange={(e) => setCurrent(e.target.value)} />
+          <Input icon={Lock} type="password" placeholder={t("new_password_placeholder")} value={newPassword} onChange={(e) => setNew(e.target.value)} />
+          <Input icon={Lock} type="password" placeholder={t("confirm_new_password_placeholder")} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+          <Button variant="accent" type="submit" className="w-full mt-2" loading={loading}>
+            Save password
+          </Button>
+        </form>
+      </div>
       <Modal open={!!modal} title={modal?.title} onClose={() => { modal?.onClose?.(); setModal(null); }}>
         {modal?.body}
       </Modal>

@@ -23,13 +23,13 @@ export default function LeaveHistoryPage() {
   }, [memberId]);
 
   const statusColor = (s) => {
-    if (s === "approved") return "bg-green-100 text-green-800";
-    if (s === "rejected") return "bg-red-100 text-red-800";
-    return "bg-amber-100 text-amber-800";
+    if (s === "approved") return "bg-orange-100 text-accent";
+    if (s === "rejected") return "bg-red-100 text-red-600";
+    return "bg-amber-100 text-amber-700";
   };
 
   return (
-    <div className="min-h-dvh bg-surface">
+    <div className="min-h-dvh bg-white pb-6">
       <PageHeader title="Leave history" backTo="/dashboard?tab=leaves" />
       {loading ? <LoadingOverlay visible /> : null}
       <div className="space-y-3 px-4 py-4">
@@ -37,7 +37,7 @@ export default function LeaveHistoryPage() {
           <p className="py-8 text-center text-muted">No leave requests yet.</p>
         ) : (
           rows.map((r) => (
-            <article key={r._id} className="glass-card p-4">
+            <article key={r._id} className="rounded-2xl border border-slate-100 bg-surface p-4">
               <div className="flex items-center justify-between">
                 <p className="font-bold text-ink">
                   {new Date(r.startDate || r.date).toLocaleDateString()} —{" "}

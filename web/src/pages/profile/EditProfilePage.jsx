@@ -55,18 +55,20 @@ export default function EditProfilePage() {
   };
 
   return (
-    <div className="min-h-dvh bg-surface">
+    <div className="min-h-dvh bg-white pb-6">
       <PageHeader title="Edit profile" backTo="/dashboard?tab=profile" />
       {loading ? <LoadingOverlay visible /> : null}
-      <form onSubmit={handleSave} className="space-y-3 px-5 py-6">
-        <Input icon={User} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Name" />
-        <Input icon={User} value={form.roomOwnerName} onChange={(e) => setForm((f) => ({ ...f, roomOwnerName: e.target.value }))} placeholder="Room owner" />
-        <Input icon={Phone} value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="Phone" />
-        <Input icon={Mail} type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="Email" />
-        <Button type="submit" className="w-full" loading={saving}>
-          Save changes
-        </Button>
-      </form>
+      <div className="px-4 py-4">
+        <form onSubmit={handleSave} className="rounded-2xl border border-slate-100 bg-surface p-5 space-y-4">
+          <Input icon={User} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Name" />
+          <Input icon={User} value={form.roomOwnerName} onChange={(e) => setForm((f) => ({ ...f, roomOwnerName: e.target.value }))} placeholder="Room owner" />
+          <Input icon={Phone} value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="Phone" />
+          <Input icon={Mail} type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="Email" />
+          <Button variant="accent" type="submit" className="w-full mt-2" loading={saving}>
+            Save changes
+          </Button>
+        </form>
+      </div>
       <Modal open={!!modal} title={modal?.title} onClose={() => { modal?.onClose?.(); setModal(null); }}>
         {modal?.body}
       </Modal>

@@ -61,7 +61,7 @@ export default function ProfileTab({ onTabChange }) {
 
   return (
     <div className="min-h-dvh bg-white pb-16">
-      <header className="safe-top relative overflow-hidden rounded-b-[28px] bg-gradient-to-br from-brand to-teal-700 px-5 pb-10 pt-4 text-white">
+      <header className="safe-top relative overflow-hidden rounded-b-[28px] bg-gradient-to-br from-accent to-orange-600 px-5 pb-10 pt-4 text-white">
         <div className="flex items-center gap-4">
           <img
             src={`https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(memberName)}`}
@@ -114,7 +114,7 @@ export default function ProfileTab({ onTabChange }) {
             onClick={() => navigate(to)}
             className="flex w-full items-center gap-3 rounded-2xl bg-surface p-4 shadow-sm transition hover:bg-slate-100"
           >
-            <Icon className="h-5 w-5 text-brand" />
+            <Icon className="h-5 w-5 text-accent" />
             <span className="flex-1 text-left font-bold text-ink">{label}</span>
             <ChevronRight className="h-5 w-5 text-muted" />
           </button>

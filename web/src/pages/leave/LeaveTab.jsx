@@ -36,6 +36,14 @@ export default function LeaveTab() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [modal, setModal] = useState(null);
+  const [member, setMember] = useState(null);
+
+  useEffect(() => {
+    if (!memberId) return;
+    api.get(`/api/members/${memberId}`)
+      .then((res) => setMember(res?.data))
+      .catch((err) => console.error("Error fetching member:", err));
+  }, [memberId]);
 
   const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
 
@@ -74,6 +82,23 @@ export default function LeaveTab() {
 
   const cells = useMemo(() => buildMonthCells(year, monthIndex), [year, monthIndex]);
 
+  const createdDate = useMemo(() => {
+    const d = member?.joiningDate || member?.createdAt || user?.createdAt;
+    if (!d) return null;
+    const date = new Date(d);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }, [member, user]);
+
+  const canPrevMonth = useMemo(() => {
+    if (!createdDate) return true;
+    const createdYear = createdDate.getFullYear();
+    const createdMonth = createdDate.getMonth();
+    const targetDate = new Date(year, monthIndex - 1, 1);
+    const targetYear = targetDate.getFullYear();
+    const targetMonth = targetDate.getMonth();
+    return (targetYear * 12 + targetMonth) >= (createdYear * 12 + createdMonth);
+  }, [year, monthIndex, createdDate]);
+
   const submitLeave = async () => {
     if (!memberId) return;
     const todayYmd = toLocalYMD(new Date());
@@ -99,7 +124,7 @@ export default function LeaveTab() {
 
   return (
     <div className="min-h-dvh bg-white pb-16">
-      <header className="safe-top rounded-b-[26px] bg-brand px-5 pb-8 pt-4 text-white">
+      <header className="safe-top rounded-b-[26px] bg-accent px-5 pb-8 pt-4 text-white">
         <div className="flex justify-end">
           <button
             type="button"
@@ -122,7 +147,7 @@ export default function LeaveTab() {
           </div>
           <div>
             <p className="text-muted">Approved</p>
-            <p className="font-extrabold text-green-700">{stats.approved}</p>
+            <p className="font-extrabold text-accent">{stats.approved}</p>
           </div>
           <div>
             <p className="text-muted">Rejected</p>
@@ -134,8 +159,9 @@ export default function LeaveTab() {
           <div className="mb-3 flex items-center justify-between">
             <button
               type="button"
-              className="text-brand font-bold"
+              className={`text-accent font-bold transition ${!canPrevMonth ? "opacity-30 cursor-not-allowed" : "active:scale-95"}`}
               onClick={() => {
+                if (!canPrevMonth) return;
                 const d = new Date(year, monthIndex - 1, 1);
                 setYear(d.getFullYear());
                 setMonthIndex(d.getMonth());
@@ -148,7 +174,7 @@ export default function LeaveTab() {
             </p>
             <button
               type="button"
-              className="text-brand font-bold"
+              className="text-accent font-bold transition active:scale-95"
               onClick={() => {
                 const d = new Date(year, monthIndex + 1, 1);
                 setYear(d.getFullYear());
@@ -171,18 +197,19 @@ export default function LeaveTab() {
               return (
                 <div
                   key={ymd}
-                    className={`flex h-9 items-center justify-center rounded-lg text-sm font-bold ${
-                      onLeave ? "bg-red-100 text-red-700" : "bg-white text-slate-700"
-                    }`}
+                  className="relative flex h-9 flex-col items-center justify-center rounded-lg bg-white text-slate-700"
                 >
-                  {day}
+                  <span className="text-sm font-bold">{day}</span>
+                  {onLeave && (
+                    <span className="absolute bottom-1.5 h-1.5 w-1.5 rounded-full bg-accent animate-fade-in" />
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
 
-        <Button className="w-full" onClick={() => setConfirmOpen(true)}>
+        <Button variant="accent" className="w-full" onClick={() => setConfirmOpen(true)}>
           <Calendar className="h-5 w-5" />
           Apply leave for today
         </Button>
@@ -194,7 +221,7 @@ export default function LeaveTab() {
           <Button variant="outline" onClick={() => setConfirmOpen(false)}>
             Cancel
           </Button>
-          <Button loading={submitting} onClick={submitLeave}>
+          <Button variant="accent" loading={submitting} onClick={submitLeave}>
             Confirm
           </Button>
         </div>

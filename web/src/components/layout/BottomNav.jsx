@@ -10,8 +10,8 @@ const tabs = [
 
 export default function BottomNav({ activeTab, onTabChange }) {
   return (
-    <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 px-3 pb-3">
-      <div className="mx-auto flex max-w-lg items-center justify-between rounded-[24px] bg-white px-2 py-2 shadow-2xl shadow-slate-900/15 ring-1 ring-slate-100">
+    <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 bg-white shadow-[0_-1px_0_0_#f1f5f9] ring-0">
+      <div className="mx-auto flex max-w-lg items-center justify-between px-2 py-1.5">
         {tabs.map(({ key, label, icon: Icon }) => {
           const active = key === activeTab;
           return (
@@ -19,7 +19,7 @@ export default function BottomNav({ activeTab, onTabChange }) {
               key={key}
               type="button"
               onClick={() => onTabChange(key)}
-              className="flex flex-1 flex-col items-center gap-1 rounded-2xl py-2 transition-all"
+              className="flex flex-1 flex-col items-center gap-1 py-1.5 transition-all"
               aria-label={label}
             >
               <div

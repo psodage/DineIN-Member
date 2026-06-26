@@ -5,6 +5,7 @@ import AppSecurityWrapper from "./components/AppSecurityWrapper";
 import LoadingOverlay from "./components/ui/LoadingOverlay";
 import Modal from "./components/ui/Modal";
 import ProtectedRoute from "./components/ProtectedRoute";
+import PageTransition, { AnimatedPage } from "./components/ui/PageTransition";
 
 import SplashPage from "./pages/SplashPage";
 import WelcomePage from "./pages/WelcomePage";
@@ -44,95 +45,100 @@ function AppRoutes() {
   }
 
   return (
-    <Routes>
-      <Route
-        path="/"
-        element={
-          isAuthenticated ? <Navigate to="/dashboard" replace /> : <SplashPage />
-        }
-      />
-      <Route path="/welcome" element={<WelcomePage />} />
-      <Route path="/login" element={<LoginEmailPage />} />
-      <Route path="/login/phone" element={<LoginPhonePage />} />
-      <Route path="/signup" element={<SignupPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
+    <>
+      <PageTransition />
+      <AnimatedPage>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              isAuthenticated ? <Navigate to="/dashboard" replace /> : <SplashPage />
+            }
+          />
+          <Route path="/welcome" element={<WelcomePage />} />
+          <Route path="/login" element={<LoginEmailPage />} />
+          <Route path="/login/phone" element={<LoginPhonePage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <DashboardPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/profile/edit"
-        element={
-          <ProtectedRoute>
-            <EditProfilePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/profile/change-password"
-        element={
-          <ProtectedRoute>
-            <ChangePasswordPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/bill/payments"
-        element={
-          <ProtectedRoute>
-            <PaymentHistoryPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/leaves/history"
-        element={
-          <ProtectedRoute>
-            <LeaveHistoryPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/snacks/history"
-        element={
-          <ProtectedRoute>
-            <SnackOrderHistoryPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/snacks/success"
-        element={
-          <ProtectedRoute>
-            <SnackPurchaseSuccessPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/snacks/split-success"
-        element={
-          <ProtectedRoute>
-            <SnackSplitSuccessPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/activity-calendar"
-        element={
-          <ProtectedRoute>
-            <ActivityCalendarPage />
-          </ProtectedRoute>
-        }
-      />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile/edit"
+            element={
+              <ProtectedRoute>
+                <EditProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile/change-password"
+            element={
+              <ProtectedRoute>
+                <ChangePasswordPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/bill/payments"
+            element={
+              <ProtectedRoute>
+                <PaymentHistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/leaves/history"
+            element={
+              <ProtectedRoute>
+                <LeaveHistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/snacks/history"
+            element={
+              <ProtectedRoute>
+                <SnackOrderHistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/snacks/success"
+            element={
+              <ProtectedRoute>
+                <SnackPurchaseSuccessPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/snacks/split-success"
+            element={
+              <ProtectedRoute>
+                <SnackSplitSuccessPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/activity-calendar"
+            element={
+              <ProtectedRoute>
+                <ActivityCalendarPage />
+              </ProtectedRoute>
+            }
+          />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AnimatedPage>
+    </>
   );
 }
 

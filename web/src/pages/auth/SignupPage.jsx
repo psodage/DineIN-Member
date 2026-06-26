@@ -88,14 +88,14 @@ export default function SignupPage() {
   return (
     <SignupLayout>
       <h2 className="text-center text-2xl font-extrabold text-ink">Create account</h2>
-      <p className="mt-1 text-center text-sm text-muted">
+      <p className="mt-2 text-center text-sm text-muted">
         Already have an account?{" "}
         <Link to="/login" className="font-semibold text-accent">
           Sign In
         </Link>
       </p>
 
-      <form onSubmit={handleSignup} className="mt-3.5 max-h-[80vh] space-y-1.5 overflow-y-auto pr-1">
+      <form onSubmit={handleSignup} className="mt-5 max-h-[80vh] space-y-3 overflow-y-auto pr-1">
         <Input icon={User} placeholder="Full name" value={form.name} onChange={set("name")} className="!min-h-[44px] !rounded-xl text-sm" />
         <Input icon={User} placeholder="Room owner name" value={form.roomOwnerName} onChange={set("roomOwnerName")} className="!min-h-[44px] !rounded-xl text-sm" />
         <Input icon={Phone} placeholder="Phone" value={form.phone} onChange={set("phone")} className="!min-h-[44px] !rounded-xl text-sm" />
@@ -104,14 +104,14 @@ export default function SignupPage() {
         <Input icon={Lock} type="password" placeholder="Confirm password" value={form.confirmPassword} onChange={set("confirmPassword")} className="!min-h-[44px] !rounded-xl text-sm" />
 
         <div>
-          <p className="mb-1 text-xs font-semibold text-ink">Meal plan</p>
+          <p className="mb-2 text-xs font-semibold text-ink">Meal plan</p>
           <div className="flex gap-2">
             {MEAL_PLANS.map((plan) => (
               <button
                 key={plan}
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, mealPlan: plan }))}
-                className={`flex-1 py-1.5 text-xs font-bold border border-orange-500 rounded-xl transition-colors duration-200 ${form.mealPlan === plan
+                className={`flex-1 py-2 text-xs font-bold border border-orange-500 rounded-xl transition-colors duration-200 ${form.mealPlan === plan
                     ? "bg-orange-500 text-white"
                     : "bg-white text-orange-500 hover:bg-orange-500 hover:text-white"
                   }`}
@@ -122,7 +122,7 @@ export default function SignupPage() {
           </div>
         </div>
 
-        <Button type="submit" variant="accent" className="w-full sticky bottom-0 mt-3 !min-h-[44px] !rounded-xl text-sm" loading={loading}>
+        <Button type="submit" variant="accent" className="w-full sticky bottom-0 mt-4 !min-h-[44px] !rounded-xl text-sm" loading={loading}>
           Create account
         </Button>
       </form>

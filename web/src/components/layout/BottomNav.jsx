@@ -1,11 +1,11 @@
 import { Calendar, Home, Receipt, User, UtensilsCrossed } from "lucide-react";
 
 const tabs = [
-  { key: "snacks", label: "Snacks", icon: UtensilsCrossed },
-  { key: "leaves", label: "Leaves", icon: Calendar },
-  { key: "home",   label: "Home",   icon: Home },
-  { key: "bill",   label: "Bill",   icon: Receipt },
-  { key: "profile",label: "Profile",icon: User },
+  { key: "snacks",  label: "Snacks",  icon: UtensilsCrossed },
+  { key: "leaves",  label: "Leaves",  icon: Calendar },
+  { key: "home",    label: "Home",    icon: Home },
+  { key: "bill",    label: "Bill",    icon: Receipt },
+  { key: "profile", label: "Profile", icon: User },
 ];
 
 export default function BottomNav({ activeTab, onTabChange }) {
@@ -25,15 +25,16 @@ export default function BottomNav({ activeTab, onTabChange }) {
               <div
                 className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all ${
                   active
-                    ? "bg-brand text-white shadow-md shadow-brand/40 scale-105"
+                    ? "scale-105 text-white shadow-md shadow-orange-400/40"
                     : "text-slate-400"
                 }`}
+                style={active ? { background: "linear-gradient(135deg,#FB923C,#9A3412)" } : {}}
               >
                 <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
               </div>
               <span
                 className={`text-[10px] font-bold transition-colors ${
-                  active ? "text-brand" : "text-slate-400"
+                  active ? "text-accent" : "text-slate-400"
                 }`}
               >
                 {label}

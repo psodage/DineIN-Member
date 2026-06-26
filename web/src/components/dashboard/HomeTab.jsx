@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BarChart3, Bell, Calendar, CheckCircle2, Clock, LogOut, RefreshCw, Utensils, User } from "lucide-react";
+import { BarChart3, Bell, Calendar, Clock, LogOut, RefreshCw, Utensils, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../../lib/api";
 import { useAuth } from "../../lib/AuthContext";
@@ -11,52 +11,52 @@ import {
   resolveMenuFromAtMenu,
 } from "./menuUtils";
 
-/* ─── Meal status badge ─────────────────────────────────────────────────── */
+/* ── Accent colours matching login/signup page ─────────────────────────── */
+const HERO_FROM  = "#FB923C"; /* orange-400 */
+const HERO_TO    = "#9A3412"; /* orange-900 */
+
+/* ── Status badge ───────────────────────────────────────────────────────── */
 function StatusBadge({ kind }) {
-  const map = {
-    active: "bg-emerald-100 text-emerald-700",
-    done: "bg-slate-100 text-slate-500",
-    upcoming: "bg-orange-100 text-orange-700",
+  const styles = {
+    active:   "bg-emerald-100 text-emerald-700",
+    done:     "bg-slate-100   text-slate-500",
+    upcoming: "bg-orange-100  text-orange-700",
   };
-  const label = { active: "In Progress", done: "Completed", upcoming: "Upcoming" };
+  const labels = { active: "In Progress", done: "Completed", upcoming: "Upcoming" };
   return (
-    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${map[kind] ?? map.upcoming}`}>
-      {label[kind] ?? "Upcoming"}
+    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${styles[kind] ?? styles.upcoming}`}>
+      {labels[kind] ?? "Upcoming"}
     </span>
   );
 }
 
-/* ─── Meal card ─────────────────────────────────────────────────────────── */
+/* ── Meal card ──────────────────────────────────────────────────────────── */
 function MealCard({ title, accentColor, timeLabel, menuText, countdown, statusKind }) {
   return (
     <div
       className="relative overflow-hidden rounded-2xl bg-white p-4 shadow-sm"
       style={{ borderLeft: `4px solid ${accentColor}` }}
     >
-      {/* faint tinted background circle */}
       <div
         className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full opacity-10"
         style={{ backgroundColor: accentColor }}
       />
-
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <div
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
             style={{ backgroundColor: `${accentColor}22` }}
           >
-            <Utensils className="h-4.5 w-4.5" style={{ color: accentColor }} />
+            <Utensils className="h-[18px] w-[18px]" style={{ color: accentColor }} />
           </div>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">{timeLabel}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted">{timeLabel}</p>
             <h3 className="font-extrabold text-ink">{title}</h3>
           </div>
         </div>
         <StatusBadge kind={statusKind} />
       </div>
-
       <p className="mt-3 text-sm leading-relaxed text-slate-600">{menuText}</p>
-
       <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-muted">
         <Clock className="h-3.5 w-3.5 shrink-0" />
         {countdown}
@@ -65,7 +65,7 @@ function MealCard({ title, accentColor, timeLabel, menuText, countdown, statusKi
   );
 }
 
-/* ─── Section header ────────────────────────────────────────────────────── */
+/* ── Section header ─────────────────────────────────────────────────────── */
 function SectionHeader({ title, action }) {
   return (
     <div className="mb-3 flex items-center justify-between">
@@ -75,24 +75,21 @@ function SectionHeader({ title, action }) {
   );
 }
 
-/* ─── HomeTab ───────────────────────────────────────────────────────────── */
+/* ── HomeTab ────────────────────────────────────────────────────────────── */
 export default function HomeTab({ pollRefreshKey }) {
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
   const { user, logout } = useAuth();
-  const memberId = user?.id || user?._id;
   const memberName = user?.name || "Member";
-  const hasUnread = Number(user?.notificationCount ?? 0) > 0;
+  const hasUnread  = Number(user?.notificationCount ?? 0) > 0;
 
-  const [now, setNow] = useState(() => new Date());
-  const [menuList, setMenuList] = useState([]);
+  const [now, setNow]             = useState(() => new Date());
+  const [menuList, setMenuList]   = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d;
   });
 
-  const todayKey = toLocalYMD(now);
+  const todayKey        = toLocalYMD(now);
   const selectedDateKey = toLocalYMD(selectedDate);
 
   useEffect(() => {
@@ -104,46 +101,37 @@ export default function HomeTab({ pollRefreshKey }) {
     try {
       const res = await api.get("/api/menu");
       setMenuList(Array.isArray(res?.data) ? res.data : []);
-    } catch {
-      setMenuList([]);
-    }
+    } catch { setMenuList([]); }
   }, []);
 
-  useEffect(() => {
-    fetchMenu();
-  }, [fetchMenu]);
+  useEffect(() => { fetchMenu(); }, [fetchMenu]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     setNow(new Date());
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
+    const d = new Date(); d.setHours(0, 0, 0, 0);
     setSelectedDate(d);
     await fetchMenu();
     setRefreshing(false);
   };
 
-  const activeMenu = useMemo(
-    () => resolveMenuFromAtMenu(menuList, selectedDate),
-    [menuList, selectedDate]
-  );
-
-  const lunchText = resolveMealText(activeMenu?.lunch);
-  const dinnerText = resolveMealText(activeMenu?.dinner);
+  const activeMenu  = useMemo(() => resolveMenuFromAtMenu(menuList, selectedDate), [menuList, selectedDate]);
+  const lunchText   = resolveMealText(activeMenu?.lunch);
+  const dinnerText  = resolveMealText(activeMenu?.dinner);
   const isSelectedToday = selectedDateKey === todayKey;
 
   const lunchWindow = useMemo(() => {
     const d = new Date(selectedDate);
-    const start = new Date(d); start.setHours(13, 30, 0, 0);
-    const end = new Date(d);   end.setHours(14, 30, 0, 0);
-    return { start, end };
+    const s = new Date(d); s.setHours(13, 30, 0, 0);
+    const e = new Date(d); e.setHours(14, 30, 0, 0);
+    return { start: s, end: e };
   }, [selectedDate]);
 
   const dinnerWindow = useMemo(() => {
     const d = new Date(selectedDate);
-    const start = new Date(d); start.setHours(19, 30, 0, 0);
-    const end = new Date(d);   end.setHours(20, 30, 0, 0);
-    return { start, end };
+    const s = new Date(d); s.setHours(19, 30, 0, 0);
+    const e = new Date(d); e.setHours(20, 30, 0, 0);
+    return { start: s, end: e };
   }, [selectedDate]);
 
   const lunchStatus = useMemo(() => {
@@ -162,14 +150,11 @@ export default function HomeTab({ pollRefreshKey }) {
 
   const weekStrip = useMemo(() => {
     const items = [];
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    for (let offset = 0; offset < 6; offset++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + offset);
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(start); d.setDate(start.getDate() + i);
       items.push({
-        key: toLocalYMD(d),
-        date: d,
+        key: toLocalYMD(d), date: d,
         weekdayShort: d.toLocaleDateString("en-US", { weekday: "short" }),
         dayOfMonth: d.getDate(),
       });
@@ -177,52 +162,53 @@ export default function HomeTab({ pollRefreshKey }) {
     return items;
   }, [todayKey]);
 
-  const handleLogout = async () => {
-    await logout();
-    navigate("/", { replace: true });
-  };
+  const handleLogout = async () => { await logout(); navigate("/", { replace: true }); };
 
   return (
     <div className="pb-32">
 
-      {/* ── Hero Header ──────────────────────────────────────────────── */}
-      <header className="safe-top relative overflow-hidden bg-brand px-5 pb-20 pt-5">
-        {/* decorative blobs */}
-        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10" />
-        <div className="pointer-events-none absolute -left-6 bottom-0 h-28 w-28 rounded-full bg-white/5" />
+      {/* ── Hero header — matches login/signup orange gradient ──── */}
+      <header
+        className="safe-top relative overflow-hidden px-5 pb-20 pt-5"
+        style={{ background: `linear-gradient(135deg, ${HERO_FROM} 0%, ${HERO_TO} 100%)` }}
+      >
+        {/* Decorative circles */}
+        <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/10" />
+        <div className="pointer-events-none absolute -left-6 bottom-0   h-28 w-28 rounded-full bg-black/10" />
+        <div className="pointer-events-none absolute right-12 bottom-12 h-14 w-14 rounded-full bg-white/10" />
 
         <div className="relative z-10 flex items-center justify-between gap-3">
-          {/* Avatar + greeting */}
+          {/* Logo + greeting */}
           <div className="flex items-center gap-3">
-            <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl border-2 border-white/30 bg-white/20">
-              <User className="h-7 w-7 text-white" />
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 shadow-inner">
+              <User className="h-6 w-6 text-white" />
             </div>
             <div>
               <p className="text-xs font-semibold text-white/70">Welcome back 👋</p>
               <p className="text-lg font-extrabold leading-tight text-white">{memberName}</p>
-              <span className="mt-1 inline-flex items-center rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-semibold text-white/90">
+              <span className="mt-1 inline-flex rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-semibold text-white/90">
                 Have a great day!
               </span>
             </div>
           </div>
 
-          {/* Action buttons */}
+          {/* Actions */}
           <div className="flex shrink-0 gap-2">
             <button
               type="button"
-              className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 transition hover:bg-white/25"
               aria-label="Notifications"
+              className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 transition hover:bg-white/25"
             >
               <Bell className="h-5 w-5 text-white" />
-              {hasUnread ? (
-                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-400 ring-2 ring-brand" />
-              ) : null}
+              {hasUnread && (
+                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-300 ring-2 ring-orange-600" />
+              )}
             </button>
             <button
               type="button"
               onClick={handleLogout}
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/80 transition hover:bg-red-500"
               aria-label="Log out"
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/20 transition hover:bg-black/30"
             >
               <LogOut className="h-5 w-5 text-white" />
             </button>
@@ -230,12 +216,12 @@ export default function HomeTab({ pollRefreshKey }) {
         </div>
       </header>
 
-      {/* ── Floating date-time pill ───────────────────────────────────── */}
+      {/* ── Floating date-time card ──────────────────────────────── */}
       <div className="-mt-8 mx-4">
-        <div className="flex items-center divide-x divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-xl shadow-slate-900/10">
+        <div className="flex items-center divide-x divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-xl shadow-orange-900/10">
           <div className="flex flex-1 items-center gap-2.5 px-4 py-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand/10">
-              <Calendar className="h-4 w-4 text-brand" />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-50">
+              <Calendar className="h-4 w-4 text-accent" />
             </div>
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Date</p>
@@ -258,16 +244,16 @@ export default function HomeTab({ pollRefreshKey }) {
         </div>
       </div>
 
-      {/* ── Main content ──────────────────────────────────────────────── */}
+      {/* ── Content sections ────────────────────────────────────── */}
       <div className="mt-4 space-y-4 px-4">
 
         {/* Week strip */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+        <div className="rounded-2xl border border-orange-100 bg-white p-3 shadow-sm">
           <p className="mb-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">This Week</p>
           <div className="grid grid-cols-6 gap-1.5">
             {weekStrip.map((item) => {
               const isSelected = item.key === selectedDateKey;
-              const isToday = item.key === todayKey;
+              const isToday    = item.key === todayKey;
               return (
                 <button
                   key={item.key}
@@ -276,9 +262,10 @@ export default function HomeTab({ pollRefreshKey }) {
                   onClick={() => isToday && setSelectedDate(new Date(item.date))}
                   className={`rounded-xl py-2.5 text-center transition-all ${
                     isSelected
-                      ? "bg-brand text-white shadow-md shadow-brand/30"
+                      ? "text-white shadow-md shadow-orange-400/40"
                       : "border border-slate-100 bg-slate-50 text-ink"
                   } ${!isToday ? "opacity-40" : "active:scale-95"}`}
+                  style={isSelected ? { background: `linear-gradient(135deg, ${HERO_FROM}, ${HERO_TO})` } : {}}
                 >
                   <p className="text-[9px] font-bold uppercase tracking-wide opacity-70">{item.weekdayShort}</p>
                   <p className={`mt-0.5 text-sm font-extrabold ${isSelected ? "text-white" : "text-ink"}`}>
@@ -291,7 +278,7 @@ export default function HomeTab({ pollRefreshKey }) {
         </div>
 
         {/* Meal overview */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">
           <SectionHeader
             title="Meal Overview"
             action={
@@ -299,7 +286,7 @@ export default function HomeTab({ pollRefreshKey }) {
                 type="button"
                 onClick={onRefresh}
                 disabled={refreshing}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold text-brand transition hover:bg-brand/10 disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold text-accent transition hover:bg-orange-50 disabled:opacity-50"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
                 {refreshing ? "Refreshing…" : "Refresh"}
@@ -327,14 +314,14 @@ export default function HomeTab({ pollRefreshKey }) {
         </div>
 
         {/* Poll */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">
           <SectionHeader
             title="Today's Poll"
             action={
-              <div className="flex items-center gap-1.5 rounded-lg bg-brand/10 px-2.5 py-1 text-xs font-bold text-brand">
+              <span className="flex items-center gap-1.5 rounded-lg bg-orange-50 px-2.5 py-1 text-xs font-bold text-accent">
                 <BarChart3 className="h-3.5 w-3.5" />
                 Live
-              </div>
+              </span>
             }
           />
           <MemberPollCard key={`poll-${pollRefreshKey}`} date={selectedDate} />

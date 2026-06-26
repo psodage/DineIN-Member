@@ -1,4 +1,4 @@
-export default function Modal({ open, title, children, onClose, actions }) {
+export default function Modal({ open, title, children, onClose, actions, type }) {
   if (!open) return null;
 
   return (
@@ -9,11 +9,24 @@ export default function Modal({ open, title, children, onClose, actions }) {
       aria-modal="true"
     >
       <div
-        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl animate-slide-up"
+        className="w-full max-w-sm rounded-2xl bg-white shadow-2xl animate-slide-up overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {title ? <h3 className="text-base font-extrabold text-ink">{title}</h3> : null}
-        <div className="mt-2 text-sm font-medium leading-relaxed text-muted">{children}</div>
+        {title ? (
+          <h3
+            className={`px-5 py-3 text-base font-extrabold text-white ${
+              type === "success"
+                ? "bg-green-500"
+                : type === "error"
+                ? "bg-red-500"
+                : "bg-gray-700"
+            }`}
+          >
+            {title}
+          </h3>
+        ) : null}
+        <div className="p-5">
+        <div className="text-sm font-medium leading-relaxed text-muted">{children}</div>
         <div className="mt-4 flex justify-end gap-2">
           {actions ?? (
             <button
@@ -24,6 +37,7 @@ export default function Modal({ open, title, children, onClose, actions }) {
               OK
             </button>
           )}
+        </div>
         </div>
       </div>
     </div>

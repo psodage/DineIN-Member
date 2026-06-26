@@ -56,8 +56,18 @@ function TopProgressBar({ running }) {
 /** Wraps page content with a fade+slide-up animation on route change */
 export function AnimatedPage({ children }) {
   const { pathname } = useLocation();
+  const [animating, setAnimating] = useState(true);
+
+  useEffect(() => {
+    setAnimating(true);
+  }, [pathname]);
+
   return (
-    <div key={pathname} className="animate-page-enter">
+    <div
+      key={pathname}
+      onAnimationEnd={() => setAnimating(false)}
+      className={animating ? "animate-page-enter" : ""}
+    >
       {children}
     </div>
   );

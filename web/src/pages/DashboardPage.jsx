@@ -71,7 +71,7 @@ export default function DashboardPage() {
   if (activeTab === "profile") content = <ProfileTab onTabChange={goTab} />;
 
   return (
-    <div className="min-h-dvh bg-surface">
+    <div className="min-h-dvh bg-white">
       {content}
       <BottomNav activeTab={activeTab} onTabChange={goTab} />
     </div>

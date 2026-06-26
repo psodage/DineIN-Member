@@ -11,7 +11,7 @@ const tabs = [
 export default function BottomNav({ activeTab, onTabChange }) {
   return (
     <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 bg-white shadow-[0_-1px_0_0_#f1f5f9] ring-0">
-      <div className="mx-auto flex max-w-lg items-center justify-between px-2 py-1.5">
+      <div className="mx-auto flex max-w-lg items-center justify-between px-2 py-0.5">
         {tabs.map(({ key, label, icon: Icon }) => {
           const active = key === activeTab;
           return (
@@ -19,21 +19,20 @@ export default function BottomNav({ activeTab, onTabChange }) {
               key={key}
               type="button"
               onClick={() => onTabChange(key)}
-              className="flex flex-1 flex-col items-center gap-1 py-1.5 transition-all"
+              className="flex flex-1 flex-col items-center gap-0.5 py-1 transition-all"
               aria-label={label}
             >
               <div
-                className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all ${
+                className={`flex h-7.5 w-11 items-center justify-center rounded-full transition-all ${
                   active
-                    ? "scale-105 text-white shadow-md shadow-orange-400/40"
+                    ? "bg-orange-50 text-accent"
                     : "text-slate-400"
                 }`}
-                style={active ? { background: "linear-gradient(135deg,#FB923C,#9A3412)" } : {}}
               >
-                <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
+                <Icon className="h-4.5 w-4.5" strokeWidth={active ? 2.5 : 2} />
               </div>
               <span
-                className={`text-[10px] font-bold transition-colors ${
+                className={`text-[9px] font-bold transition-colors ${
                   active ? "text-accent" : "text-slate-400"
                 }`}
               >

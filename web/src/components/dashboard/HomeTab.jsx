@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  BarChart3, Bell, Calendar, Clock, RefreshCw, Utensils,
+  BarChart3, Bell, Calendar, Clock, RefreshCw, User, Utensils,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../../lib/api";
@@ -14,8 +14,8 @@ import {
 } from "./menuUtils";
 
 /* ── Brand colours ─────────────────────────────────────────────────────── */
-const HERO_FROM = "#FB923C";
-const HERO_TO   = "#9A3412";
+const HERO_FROM = "#0f8f88";
+const HERO_TO   = "#0b6f69";
 
 /* ── Status badge ───────────────────────────────────────────────────────── */
 function StatusBadge({ kind }) {
@@ -95,6 +95,17 @@ export default function HomeTab({ pollRefreshKey }) {
   const todayKey = toLocalYMD(now);
   const selectedDateKey = toLocalYMD(selectedDate);
 
+  const greeting = useMemo(() => {
+    const hrs = now.getHours();
+    if (hrs < 12) return "Good Morning";
+    if (hrs < 17) return "Good Afternoon";
+    return "Good Evening";
+  }, [now]);
+
+  const firstName = useMemo(() => {
+    return (user?.name || "Member").trim().split(" ")[0];
+  }, [user?.name]);
+
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 15000);
     return () => clearInterval(id);
@@ -169,60 +180,44 @@ export default function HomeTab({ pollRefreshKey }) {
 
   return (
     <>
-      <div className="pb-24">
+      <div className="pb-16">
 
-        {/* ── Top bar — login page style ───────────────────────── */}
-        <header className="safe-top sticky top-0 z-30 bg-white shadow-sm">
-          <div className="flex items-center gap-3 px-4 py-2.5">
-
-            {/* Logo + brand */}
-            <div className="flex flex-1 items-center gap-2.5">
-              <img src="/logo2.png" alt="DineIN" className="h-8 w-auto" />
-              <div className="h-8 w-px bg-slate-200" />
-              <div>
-                <p className="text-sm font-extrabold leading-none text-slate-800">DineIN</p>
-                <p className="text-[10px] leading-none text-slate-500 mt-0.5">Eat Smart. Live Easy.</p>
-              </div>
+        {/* ── Top bar — greeting & time header ─────────────────── */}
+        <div className="safe-top px-4.5 mt-1.5 pt-7 pb-2">
+          <div className="flex items-center justify-between">
+            {/* Left side: Greeting + Date & Time */}
+            <div className="min-w-0">
+              <h1 className="text-sm font-extrabold text-ink leading-tight tracking-tight">
+                {greeting}, {firstName}
+              </h1>
+              <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-muted leading-none">
+                {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} • {now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+              </p>
             </div>
 
-            {/* Notification bell */}
-            <button
-              type="button"
-              aria-label="Notifications"
-              className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition hover:bg-slate-100"
-            >
-              <Bell className="h-5 w-5 text-slate-600" />
-              {hasUnread && (
-                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent ring-2 ring-white" />
-              )}
-            </button>
-          </div>
-        </header>
+            {/* Right side: Notifications + Profile */}
+            <div className="flex items-center gap-2.5 shrink-0">
+              {/* Notification bell */}
+              <button
+                type="button"
+                aria-label="Notifications"
+                className="relative flex h-8.5 w-8.5 items-center justify-center rounded-full bg-surface border border-slate-100 transition hover:bg-slate-100 active:scale-95"
+              >
+                <Bell className="h-4.5 w-4.5 text-slate-600" />
+                {hasUnread && (
+                  <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent ring-2 ring-white" />
+                )}
+              </button>
 
-        {/* ── Floating date-time card ──────────────────────────── */}
-        <div className="mx-3.5 mt-3.5">
-          <div className="flex items-center divide-x divide-slate-100 overflow-hidden rounded-xl bg-white shadow-md shadow-orange-900/10 border border-orange-50">
-            <div className="flex flex-1 items-center gap-2 px-3 py-2.5">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-orange-50">
-                <Calendar className="h-3.5 w-3.5 text-accent" />
-              </div>
-              <div>
-                <p className="text-[9px] font-semibold uppercase tracking-wider text-muted">Date</p>
-                <p className="text-xs font-bold text-ink leading-tight">
-                  {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-1 items-center gap-2 px-3 py-2.5">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-orange-50">
-                <Clock className="h-3.5 w-3.5 text-accent" />
-              </div>
-              <div>
-                <p className="text-[9px] font-semibold uppercase tracking-wider text-muted">Time</p>
-                <p className="text-xs font-bold text-ink leading-tight">
-                  {now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                </p>
-              </div>
+              {/* Profile icon */}
+              <button
+                type="button"
+                aria-label="Profile"
+                onClick={() => navigate("/dashboard?tab=profile")}
+                className="relative flex h-8.5 w-8.5 items-center justify-center rounded-full bg-surface border border-slate-100 transition hover:bg-slate-100 active:scale-95"
+              >
+                <User className="h-4.5 w-4.5 text-slate-600" />
+              </button>
             </div>
           </div>
         </div>
@@ -231,7 +226,7 @@ export default function HomeTab({ pollRefreshKey }) {
         <div className="mt-3.5 space-y-3 px-3.5">
 
           {/* Week strip */}
-          <div className="rounded-2xl border border-orange-50 bg-white p-2.5 shadow-sm">
+          <div className="rounded-2xl border border-orange-50 bg-surface p-2.5 shadow-sm">
             <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted">This Week</p>
             <div className="grid grid-cols-6 gap-1">
               {weekStrip.map((item) => {
@@ -244,10 +239,9 @@ export default function HomeTab({ pollRefreshKey }) {
                     disabled={!isToday}
                     onClick={() => isToday && setSelectedDate(new Date(item.date))}
                     className={`rounded-lg py-1.5 text-center transition-all ${isSelected
-                      ? "text-white shadow-md shadow-orange-400/40"
-                      : "border border-slate-100 bg-slate-50 text-ink"
+                      ? "bg-accent text-white shadow-md shadow-orange-500/20"
+                      : "border border-slate-100 bg-white text-ink"
                     } ${!isToday ? "opacity-40" : "active:scale-95"}`}
-                    style={isSelected ? { background: `linear-gradient(135deg, ${HERO_FROM}, ${HERO_TO})` } : {}}
                   >
                     <p className="text-[8px] font-bold uppercase tracking-wide opacity-70">{item.weekdayShort}</p>
                     <p className={`mt-0.5 text-xs font-extrabold ${isSelected ? "text-white" : "text-ink"}`}>
@@ -260,7 +254,7 @@ export default function HomeTab({ pollRefreshKey }) {
           </div>
 
           {/* Meal overview */}
-          <div className="rounded-2xl border border-orange-50 bg-white p-3 shadow-sm">
+          <div className="rounded-2xl border border-orange-50 bg-surface p-3 shadow-sm">
             <SectionHeader
               title="Meal Overview"
               action={
@@ -295,8 +289,8 @@ export default function HomeTab({ pollRefreshKey }) {
             </div>
           </div>
 
-          {/* Poll */}
-          <div className="rounded-2xl border border-orange-50 bg-white p-3 shadow-sm">
+          {/* Today's Poll */}
+          <div className="rounded-2xl border border-orange-50 bg-surface p-3 shadow-sm">
             <SectionHeader
               title="Today's Poll"
               action={

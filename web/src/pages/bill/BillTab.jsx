@@ -62,7 +62,7 @@ export default function BillTab() {
   if (loading) return <LoadingOverlay visible />;
 
   return (
-    <div className="min-h-dvh bg-surface pb-28">
+    <div className="min-h-dvh bg-white pb-16">
       <header className="safe-top rounded-b-[26px] bg-brand px-5 pb-8 pt-4 text-white">
         <div className="flex items-center justify-between">
           <div>
@@ -76,10 +76,10 @@ export default function BillTab() {
       </header>
 
       <div className="space-y-4 px-4 -mt-6">
-        <div className="glass-card p-5 animate-slide-up">
+        <div className="rounded-2xl border border-slate-100 bg-surface p-5 animate-slide-up">
           <p className="text-sm font-semibold text-muted">Total bill</p>
           <p className="mt-1 text-3xl font-extrabold text-ink">{formatCurrencyINR(premium.total)}</p>
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-white">
             <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${premium.pct}%` }} />
           </div>
           <div className="mt-3 flex justify-between text-sm">
@@ -95,7 +95,7 @@ export default function BillTab() {
             ["Expenses", monthSummary?.expenseShare],
             ["Leave adj.", monthSummary?.leaveDeduction],
           ].map(([label, val]) => (
-            <div key={label} className="rounded-2xl border border-slate-100 bg-white p-3">
+            <div key={label} className="rounded-2xl border border-slate-100 bg-surface p-3">
               <p className="text-xs font-semibold text-muted">{label}</p>
               <p className="mt-1 font-extrabold text-ink">{formatCurrencyINR(val)}</p>
             </div>
@@ -105,20 +105,20 @@ export default function BillTab() {
         <button
           type="button"
           onClick={() => navigate("/bill/payments")}
-          className="flex w-full items-center justify-between rounded-2xl bg-white p-4 shadow-sm"
+          className="flex w-full items-center justify-between rounded-2xl bg-surface p-4 shadow-sm"
         >
           <span className="font-bold text-ink">Payment history</span>
           <ChevronRight className="h-5 w-5 text-muted" />
         </button>
 
         {history.length > 0 ? (
-          <div className="glass-card p-4">
+          <div className="rounded-2xl border border-slate-100 bg-surface p-4">
             <h2 className="mb-3 font-extrabold text-ink">Past months</h2>
             <ul className="space-y-2">
               {history.slice(0, 6).map((row) => (
                 <li
                   key={monthKeyLocal(row?.month) || row?._id}
-                  className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm"
+                  className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-sm"
                 >
                   <span className="font-semibold">{formatMonthLabel(row?.month)}</span>
                   <span className="font-bold text-ink">{formatCurrencyINR(row?.due ?? row?.totalBill)}</span>
@@ -129,7 +129,7 @@ export default function BillTab() {
         ) : null}
 
         {payments.length > 0 ? (
-          <div className="glass-card p-4">
+          <div className="rounded-2xl border border-slate-100 bg-surface p-4">
             <h2 className="mb-3 font-extrabold text-ink">Recent payments</h2>
             <ul className="space-y-2">
               {payments.slice(0, 4).map((p) => (

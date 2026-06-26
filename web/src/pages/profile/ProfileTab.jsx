@@ -60,7 +60,7 @@ export default function ProfileTab({ onTabChange }) {
   };
 
   return (
-    <div className="min-h-dvh bg-surface pb-28">
+    <div className="min-h-dvh bg-white pb-16">
       <header className="safe-top relative overflow-hidden rounded-b-[28px] bg-gradient-to-br from-brand to-teal-700 px-5 pb-10 pt-4 text-white">
         <div className="flex items-center gap-4">
           <img
@@ -80,7 +80,7 @@ export default function ProfileTab({ onTabChange }) {
       </header>
 
       <div className="space-y-4 px-4 -mt-6">
-        <div className="glass-card grid grid-cols-2 gap-3 p-4">
+        <div className="rounded-2xl border border-slate-100 bg-surface grid grid-cols-2 gap-3 p-4">
           <div>
             <p className="text-xs text-muted">Meal plan</p>
             <p className="font-extrabold text-ink">{mealPlan}</p>
@@ -112,7 +112,7 @@ export default function ProfileTab({ onTabChange }) {
             key={to}
             type="button"
             onClick={() => navigate(to)}
-            className="flex w-full items-center gap-3 rounded-2xl bg-white p-4 shadow-sm transition hover:bg-slate-50"
+            className="flex w-full items-center gap-3 rounded-2xl bg-surface p-4 shadow-sm transition hover:bg-slate-100"
           >
             <Icon className="h-5 w-5 text-brand" />
             <span className="flex-1 text-left font-bold text-ink">{label}</span>

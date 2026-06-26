@@ -138,7 +138,7 @@ export default function SnacksTab() {
   };
 
   return (
-    <div className="min-h-dvh bg-surface pb-32">
+    <div className="min-h-dvh bg-white pb-20">
       <div className="safe-top sticky top-0 z-10 border-b border-slate-100 bg-white/95 px-4 py-4 backdrop-blur">
         <div className="flex items-center justify-between">
           <div>
@@ -168,7 +168,7 @@ export default function SnacksTab() {
             const stock = getSnackStock(item);
             const canInc = qty < stock;
             return (
-              <article key={key} className="glass-card p-4 animate-fade-in">
+              <article key={key} className="rounded-2xl border border-slate-100 bg-surface p-4 animate-fade-in">
                 <div className="flex gap-3">
                   <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand/10 text-brand">
                     <UtensilsCrossed className="h-8 w-8" />
@@ -205,7 +205,7 @@ export default function SnacksTab() {
       </div>
 
       {totalItems > 0 ? (
-        <div className="safe-bottom fixed inset-x-0 bottom-20 z-20 px-4">
+        <div className="safe-bottom fixed inset-x-0 bottom-16 z-20 px-4">
           <div className="mx-auto max-w-lg rounded-2xl bg-ink p-4 text-white shadow-2xl">
             <div className="flex items-center justify-between text-sm">
               <span>{totalItems} item(s)</span>

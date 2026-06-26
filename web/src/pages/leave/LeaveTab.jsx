@@ -98,7 +98,7 @@ export default function LeaveTab() {
   if (loading) return <LoadingOverlay visible />;
 
   return (
-    <div className="min-h-dvh bg-surface pb-28">
+    <div className="min-h-dvh bg-white pb-16">
       <header className="safe-top rounded-b-[26px] bg-brand px-5 pb-8 pt-4 text-white">
         <div className="flex justify-end">
           <button
@@ -115,7 +115,7 @@ export default function LeaveTab() {
       </header>
 
       <div className="space-y-4 px-4 -mt-4">
-        <div className="glass-card grid grid-cols-3 gap-2 p-4 text-center text-sm">
+        <div className="rounded-2xl border border-slate-100 bg-surface grid grid-cols-3 gap-2 p-4 text-center text-sm">
           <div>
             <p className="text-muted">Pending</p>
             <p className="font-extrabold text-ink">{stats.pending}</p>
@@ -130,7 +130,7 @@ export default function LeaveTab() {
           </div>
         </div>
 
-        <div className="glass-card p-4">
+        <div className="rounded-2xl border border-slate-100 bg-surface p-4">
           <div className="mb-3 flex items-center justify-between">
             <button
               type="button"
@@ -171,9 +171,9 @@ export default function LeaveTab() {
               return (
                 <div
                   key={ymd}
-                  className={`flex h-9 items-center justify-center rounded-lg text-sm font-bold ${
-                    onLeave ? "bg-red-100 text-red-700" : "bg-slate-50 text-slate-700"
-                  }`}
+                    className={`flex h-9 items-center justify-center rounded-lg text-sm font-bold ${
+                      onLeave ? "bg-red-100 text-red-700" : "bg-white text-slate-700"
+                    }`}
                 >
                   {day}
                 </div>

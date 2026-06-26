@@ -12,14 +12,14 @@ import {
 } from "./menuUtils";
 
 /* ── Accent colours matching login/signup page ─────────────────────────── */
-const HERO_FROM  = "#FB923C"; /* orange-400 */
-const HERO_TO    = "#9A3412"; /* orange-900 */
+const HERO_FROM = "#FB923C"; /* orange-400 */
+const HERO_TO = "#9A3412"; /* orange-900 */
 
 /* ── Status badge ───────────────────────────────────────────────────────── */
 function StatusBadge({ kind }) {
   const styles = {
-    active:   "bg-emerald-100 text-emerald-700",
-    done:     "bg-slate-100   text-slate-500",
+    active: "bg-emerald-100 text-emerald-700",
+    done: "bg-slate-100   text-slate-500",
     upcoming: "bg-orange-100  text-orange-700",
   };
   const labels = { active: "In Progress", done: "Completed", upcoming: "Upcoming" };
@@ -77,19 +77,19 @@ function SectionHeader({ title, action }) {
 
 /* ── HomeTab ────────────────────────────────────────────────────────────── */
 export default function HomeTab({ pollRefreshKey }) {
-  const navigate  = useNavigate();
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const memberName = user?.name || "Member";
-  const hasUnread  = Number(user?.notificationCount ?? 0) > 0;
+  const hasUnread = Number(user?.notificationCount ?? 0) > 0;
 
-  const [now, setNow]             = useState(() => new Date());
-  const [menuList, setMenuList]   = useState([]);
+  const [now, setNow] = useState(() => new Date());
+  const [menuList, setMenuList] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date(); d.setHours(0, 0, 0, 0); return d;
   });
 
-  const todayKey        = toLocalYMD(now);
+  const todayKey = toLocalYMD(now);
   const selectedDateKey = toLocalYMD(selectedDate);
 
   useEffect(() => {
@@ -115,9 +115,9 @@ export default function HomeTab({ pollRefreshKey }) {
     setRefreshing(false);
   };
 
-  const activeMenu  = useMemo(() => resolveMenuFromAtMenu(menuList, selectedDate), [menuList, selectedDate]);
-  const lunchText   = resolveMealText(activeMenu?.lunch);
-  const dinnerText  = resolveMealText(activeMenu?.dinner);
+  const activeMenu = useMemo(() => resolveMenuFromAtMenu(menuList, selectedDate), [menuList, selectedDate]);
+  const lunchText = resolveMealText(activeMenu?.lunch);
+  const dinnerText = resolveMealText(activeMenu?.dinner);
   const isSelectedToday = selectedDateKey === todayKey;
 
   const lunchWindow = useMemo(() => {
@@ -169,7 +169,7 @@ export default function HomeTab({ pollRefreshKey }) {
 
       {/* ── Hero header — matches login/signup orange gradient ──── */}
       <header
-        className="safe-top relative overflow-hidden px-5 pb-20 pt-5"
+        className="safe-top relative overflow-hidden px-5 pb-8 pt-5"
         style={{ background: `linear-gradient(135deg, ${HERO_FROM} 0%, ${HERO_TO} 100%)` }}
       >
         {/* Decorative circles */}
@@ -184,11 +184,9 @@ export default function HomeTab({ pollRefreshKey }) {
               <User className="h-6 w-6 text-white" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-white/70">Welcome back 👋</p>
+
               <p className="text-lg font-extrabold leading-tight text-white">{memberName}</p>
-              <span className="mt-1 inline-flex rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-semibold text-white/90">
-                Have a great day!
-              </span>
+
             </div>
           </div>
 
@@ -217,7 +215,7 @@ export default function HomeTab({ pollRefreshKey }) {
       </header>
 
       {/* ── Floating date-time card ──────────────────────────────── */}
-      <div className="-mt-8 mx-4">
+      <div className="-mt-6 mx-4">
         <div className="flex items-center divide-x divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-xl shadow-orange-900/10">
           <div className="flex flex-1 items-center gap-2.5 px-4 py-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-50">
@@ -253,18 +251,17 @@ export default function HomeTab({ pollRefreshKey }) {
           <div className="grid grid-cols-6 gap-1.5">
             {weekStrip.map((item) => {
               const isSelected = item.key === selectedDateKey;
-              const isToday    = item.key === todayKey;
+              const isToday = item.key === todayKey;
               return (
                 <button
                   key={item.key}
                   type="button"
                   disabled={!isToday}
                   onClick={() => isToday && setSelectedDate(new Date(item.date))}
-                  className={`rounded-xl py-2.5 text-center transition-all ${
-                    isSelected
-                      ? "text-white shadow-md shadow-orange-400/40"
-                      : "border border-slate-100 bg-slate-50 text-ink"
-                  } ${!isToday ? "opacity-40" : "active:scale-95"}`}
+                  className={`rounded-xl py-2.5 text-center transition-all ${isSelected
+                    ? "text-white shadow-md shadow-orange-400/40"
+                    : "border border-slate-100 bg-slate-50 text-ink"
+                    } ${!isToday ? "opacity-40" : "active:scale-95"}`}
                   style={isSelected ? { background: `linear-gradient(135deg, ${HERO_FROM}, ${HERO_TO})` } : {}}
                 >
                   <p className="text-[9px] font-bold uppercase tracking-wide opacity-70">{item.weekdayShort}</p>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  BarChart3, Bell, Calendar, Clock, RefreshCw, User, Utensils,
+  BarChart3, Bell, Calendar, Clock, RefreshCw, Utensils,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../../lib/api";
@@ -15,13 +15,13 @@ import {
 
 /* ── Brand colours ─────────────────────────────────────────────────────── */
 const HERO_FROM = "#0f8f88";
-const HERO_TO   = "#0b6f69";
+const HERO_TO = "#0b6f69";
 
 /* ── Status badge ───────────────────────────────────────────────────────── */
 function StatusBadge({ kind }) {
   const styles = {
-    active:   "bg-emerald-100 text-emerald-700",
-    done:     "bg-slate-100   text-slate-500",
+    active: "bg-emerald-100 text-emerald-700",
+    done: "bg-slate-100   text-slate-500",
     upcoming: "bg-orange-100  text-orange-700",
   };
   const labels = { active: "In Progress", done: "Completed", upcoming: "Upcoming" };
@@ -132,7 +132,7 @@ export default function HomeTab({ pollRefreshKey }) {
 
 
   const activeMenu = useMemo(() => resolveMenuFromAtMenu(menuList, selectedDate), [menuList, selectedDate]);
-  const lunchText  = resolveMealText(activeMenu?.lunch);
+  const lunchText = resolveMealText(activeMenu?.lunch);
   const dinnerText = resolveMealText(activeMenu?.dinner);
   const isSelectedToday = selectedDateKey === todayKey;
 
@@ -183,47 +183,41 @@ export default function HomeTab({ pollRefreshKey }) {
       <div className="pb-16">
 
         {/* ── Top bar — greeting & time header ─────────────────── */}
-        <div className="safe-top px-4.5 mt-1.5 pt-7 pb-2">
-          <div className="flex items-center justify-between">
-            {/* Left side: Greeting + Date & Time */}
-            <div className="min-w-0">
-              <h1 className="text-sm font-extrabold text-ink leading-tight tracking-tight">
-                {greeting}, {firstName}
-              </h1>
-              <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-muted leading-none">
-                {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} • {now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-              </p>
-            </div>
+        <div className="safe-top fixed top-0 left-0 right-0 z-30 bg-white border-b border-slate-100 shadow-sm">
+          <div className="mx-auto max-w-lg px-4.5 pt-3 pb-2">
+            <div className="flex items-center justify-between">
+              {/* Left side: Greeting + Date & Time */}
+              <div className="min-w-0">
+                <h1 className="text-sm font-extrabold text-ink leading-tight tracking-tight">
+                  {greeting}, {firstName}
+                </h1>
+                <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-muted leading-none">
+                  {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} • {now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                </p>
+              </div>
 
-            {/* Right side: Notifications + Profile */}
-            <div className="flex items-center gap-2.5 shrink-0">
-              {/* Notification bell */}
-              <button
-                type="button"
-                aria-label="Notifications"
-                className="relative flex h-8.5 w-8.5 items-center justify-center rounded-full bg-surface border border-slate-100 transition hover:bg-slate-100 active:scale-95"
-              >
-                <Bell className="h-4.5 w-4.5 text-slate-600" />
-                {hasUnread && (
-                  <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent ring-2 ring-white" />
-                )}
-              </button>
-
-              {/* Profile icon */}
-              <button
-                type="button"
-                aria-label="Profile"
-                onClick={() => navigate("/dashboard?tab=profile")}
-                className="relative flex h-8.5 w-8.5 items-center justify-center rounded-full bg-surface border border-slate-100 transition hover:bg-slate-100 active:scale-95"
-              >
-                <User className="h-4.5 w-4.5 text-slate-600" />
-              </button>
+              {/* Right side: Notifications */}
+              <div className="flex items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  aria-label="Notifications"
+                  className="relative flex h-8.5 w-8.5 items-center justify-center rounded-full bg-surface border border-slate-100 transition hover:bg-slate-100 active:scale-95"
+                >
+                  <Bell className="h-4.5 w-4.5 text-slate-600" />
+                  {hasUnread && (
+                    <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent ring-2 ring-white" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
+        {/* Spacer to offset the fixed header */}
+        <div className="safe-top pt-14" />
+
         {/* ── Content sections ─────────────────────────────────── */}
-        <div className="mt-3.5 space-y-3 px-3.5">
+        <div className="mt-17 space-y-3 px-3.5">
 
           {/* Week strip */}
           <div className="rounded-2xl border border-orange-50 bg-surface p-2.5 shadow-sm">
@@ -231,7 +225,7 @@ export default function HomeTab({ pollRefreshKey }) {
             <div className="grid grid-cols-6 gap-1">
               {weekStrip.map((item) => {
                 const isSelected = item.key === selectedDateKey;
-                const isToday    = item.key === todayKey;
+                const isToday = item.key === todayKey;
                 return (
                   <button
                     key={item.key}
@@ -241,7 +235,7 @@ export default function HomeTab({ pollRefreshKey }) {
                     className={`rounded-lg py-1.5 text-center transition-all ${isSelected
                       ? "bg-accent text-white shadow-md shadow-orange-500/20"
                       : "border border-slate-100 bg-white text-ink"
-                    } ${!isToday ? "opacity-40" : "active:scale-95"}`}
+                      } ${!isToday ? "opacity-40" : "active:scale-95"}`}
                   >
                     <p className="text-[8px] font-bold uppercase tracking-wide opacity-70">{item.weekdayShort}</p>
                     <p className={`mt-0.5 text-xs font-extrabold ${isSelected ? "text-white" : "text-ink"}`}>

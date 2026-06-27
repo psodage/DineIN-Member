@@ -99,6 +99,13 @@ export default function LeaveTab() {
     return (targetYear * 12 + targetMonth) >= (createdYear * 12 + createdMonth);
   }, [year, monthIndex, createdDate]);
 
+  const canNextMonth = useMemo(() => {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth();
+    return (year * 12 + monthIndex) < (currentYear * 12 + currentMonth);
+  }, [year, monthIndex]);
+
   const submitLeave = async () => {
     if (!memberId) return;
     const todayYmd = toLocalYMD(new Date());
@@ -174,8 +181,9 @@ export default function LeaveTab() {
             </p>
             <button
               type="button"
-              className="text-accent font-bold transition active:scale-95"
+              className={`text-accent font-bold transition ${!canNextMonth ? "opacity-30 cursor-not-allowed" : "active:scale-95"}`}
               onClick={() => {
+                if (!canNextMonth) return;
                 const d = new Date(year, monthIndex + 1, 1);
                 setYear(d.getFullYear());
                 setMonthIndex(d.getMonth());

@@ -31,7 +31,8 @@ export default function LeaveTab() {
   const [year, setYear] = useState(now.getFullYear());
   const [monthIndex, setMonthIndex] = useState(now.getMonth());
   const [loading, setLoading] = useState(true);
-  const [leaveDates, setLeaveDates] = useState(new Set());
+  const [activeDays, setActiveDays] = useState(new Set());
+  const [inactiveDays, setInactiveDays] = useState(new Set());
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0 });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -57,13 +58,12 @@ export default function LeaveTab() {
       const [leaveRes] = await Promise.all([
         api.get(`/api/leave/self/${memberId}/month?month=${monthKey}`),
       ]);
-      const dates = new Set();
+      const act = Array.isArray(leaveRes?.data?.activeDays) ? leaveRes.data.activeDays : [];
+      const inact = Array.isArray(leaveRes?.data?.inactiveDays) ? leaveRes.data.inactiveDays : [];
+      setActiveDays(new Set(act));
+      setInactiveDays(new Set(inact));
+
       const requests = Array.isArray(leaveRes?.data?.requests) ? leaveRes.data.requests : [];
-      requests.forEach((r) => {
-        if (r?.date) dates.add(toLocalYMD(r.date));
-        if (r?.startDate) dates.add(toLocalYMD(r.startDate));
-      });
-      setLeaveDates(dates);
       setStats({
         pending: requests.filter((r) => r.status === "pending").length,
         approved: requests.filter((r) => r.status === "approved").length,
@@ -201,16 +201,29 @@ export default function LeaveTab() {
             {cells.map((day, i) => {
               if (!day) return <div key={`e-${i}`} />;
               const ymd = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-              const onLeave = leaveDates.has(ymd);
+              const isInactive = inactiveDays.has(ymd);
+              const isActive = activeDays.has(ymd);
+
+              const today = new Date();
+              const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+              const cellDate = new Date(year, monthIndex, day);
+              const isFuture = cellDate > todayOnly;
+
+              let tileClass = "bg-white text-slate-700 border border-slate-100";
+              if (isFuture) {
+                tileClass = "bg-slate-50 text-slate-400 border border-slate-100";
+              } else if (isInactive) {
+                tileClass = "bg-rose-50 text-rose-700 border border-rose-200";
+              } else if (isActive) {
+                tileClass = "bg-emerald-50 text-emerald-700 border border-emerald-200";
+              }
+
               return (
                 <div
                   key={ymd}
-                  className="relative flex h-9 flex-col items-center justify-center rounded-lg bg-white text-slate-700"
+                  className={`relative flex h-9 flex-col items-center justify-center rounded-lg ${tileClass}`}
                 >
                   <span className="text-sm font-bold">{day}</span>
-                  {onLeave && (
-                    <span className="absolute bottom-1.5 h-1.5 w-1.5 rounded-full bg-accent animate-fade-in" />
-                  )}
                 </div>
               );
             })}

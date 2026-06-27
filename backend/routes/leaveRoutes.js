@@ -95,6 +95,11 @@ router.get(
       const monthStart = parseMonthQuery(req.query?.month);
       const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
 
+      const leaveStat = await LeaveStat.findOne({
+        memberId,
+        month: monthStart,
+      }).lean();
+
       const monthLeaves = await LeaveRequest.find({
         memberId,
         type: "Leave",
@@ -119,6 +124,31 @@ router.get(
         days.forEach((d) => approvedSet.add(d));
       }
 
+      if (leaveStat) {
+        if (Array.isArray(leaveStat.chargeableLeaveDayKeys)) {
+          leaveStat.chargeableLeaveDayKeys.forEach((d) => approvedSet.add(d));
+        }
+        if (Array.isArray(leaveStat.shortLeaveDayKeys)) {
+          leaveStat.shortLeaveDayKeys.forEach((d) => approvedSet.add(d));
+        }
+      }
+
+      const inactiveDays = Array.from(approvedSet).sort();
+
+      const activeDays = [];
+      const today = new Date();
+      const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endLimit = monthEnd < todayOnly ? monthEnd : todayOnly;
+
+      let cur = new Date(monthStart);
+      while (cur <= endLimit) {
+        const ymd = formatYMDLocal(cur);
+        if (!approvedSet.has(ymd)) {
+          activeDays.push(ymd);
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+
       const leaveStreakRequiredDays = await getLeaveStreakRequiredDays();
 
       return res.json({
@@ -130,6 +160,8 @@ router.get(
         pendingRequestCount: pendingCount,
         requests: monthLeaves,
         leaveStreakRequiredDays,
+        activeDays,
+        inactiveDays,
       });
     } catch (error) {
       console.error("Get member month leaves error:", error);

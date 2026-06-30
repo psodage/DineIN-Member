@@ -163,13 +163,11 @@ export default function SidebarDrawer({ isOpen, onClose }) {
           </button>
 
           <div className="flex items-center gap-3">
-            <img
-              src={`https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(memberName)}`}
-              alt={memberName}
-              className="h-14 w-14 rounded-full border-2 border-white/70 bg-white object-cover"
-            />
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 border-white/70 bg-white/10 text-white">
+              <User className="h-7 w-7" />
+            </div>
             <div className="min-w-0">
-              <h2 className="truncate text-base font-extrabold text-white">{memberName}</h2>
+              <h2 className="truncate text-base font-extrabold text-white mt-1.5">{memberName}</h2>
               <div className="mt-1 flex items-center gap-1.5">
                 <span
                   className={`h-2 w-2 rounded-full ${
@@ -183,7 +181,7 @@ export default function SidebarDrawer({ isOpen, onClose }) {
         </div>
 
         {/* Navigation Items */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+        <div className="flex-1 overflow-y-auto no-scrollbar px-4 py-4 space-y-5">
           {menuGroups.map((group) => (
             <div key={group.title} className="space-y-1.5">
               <h3 className="px-3 text-[10px] font-bold uppercase tracking-wider text-muted/80">

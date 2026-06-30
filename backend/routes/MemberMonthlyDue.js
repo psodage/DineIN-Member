@@ -88,15 +88,16 @@ function buildMealSummary({ memberDoc, monthStart, inactiveDays, dailyRate }) {
     cappedEnd && cappedEnd.getTime() < monthEndDateOnly.getTime() ? cappedEnd : monthEndDateOnly;
 
   const eligibleDays = daysInclusive(eligibleStart, eligibleEnd);
-  const rawLeaveDeduction = Math.max(0, Number(inactiveDays || 0) * Number(dailyRate || 0));
+  const leaveDeductionRate = getLeaveDeductionRate(memberDoc?.mealPlan);
+  const rawLeaveDeduction = Math.max(0, Number(inactiveDays || 0) * leaveDeductionRate);
   const grossMealAmount = Math.max(0, eligibleDays * Number(dailyRate || 0));
   const leaveDeduction = Math.min(grossMealAmount, rawLeaveDeduction);
-  const mealAmount = Math.max(0, grossMealAmount - leaveDeduction);
+  const mealAmount = Math.round(Math.max(0, grossMealAmount - leaveDeduction));
 
   return {
     eligibleDays,
-    grossMealAmount,
-    leaveDeduction,
+    grossMealAmount: Math.round(grossMealAmount),
+    leaveDeduction: Math.round(leaveDeduction),
     mealAmount,
   };
 }
@@ -161,8 +162,8 @@ router.get(
         inactiveDays,
         dailyRate,
       });
-      const mealAmount = Math.max(0, dailyRate);
-      const leaveDeduction = Math.max(0, chargeableKeys.length * leaveDeductionRate);
+      const mealAmount = mealSummary.mealAmount;
+      const leaveDeduction = mealSummary.leaveDeduction;
 
       return res.json({
         memberId,
@@ -237,8 +238,8 @@ router.get(
         inactiveDays,
         dailyRate,
       });
-      const leaveDeduction = Math.max(0, chargeableKeys.length * leaveDeductionRate);
-      const mealAmount = Math.max(0, dailyRate);
+      const mealAmount = mealSummary.mealAmount;
+      const leaveDeduction = mealSummary.leaveDeduction;
       const snacksAmount = Number(computedDoc?.snacksAmount || 0);
       const expenseShare = Number(computedDoc?.expenseShare || 0);
 

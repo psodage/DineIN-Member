@@ -26,5 +26,5 @@ export function monthKeyLocal(dateLike) {
 
 export function formatCurrencyINR(amount) {
   const n = Number(amount || 0);
-  return `₹${n.toLocaleString("en-IN")}`;
+  return `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 }

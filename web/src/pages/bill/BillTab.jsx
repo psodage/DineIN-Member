@@ -59,6 +59,25 @@ export default function BillTab() {
     return { total, paid, due, pct };
   }, [monthSummary]);
 
+  const totalDue = useMemo(() => {
+    const currentMonthKey = monthSummary?.month ? monthKeyLocal(monthSummary.month) : "";
+    let sum = 0;
+    let currentMonthCounted = false;
+    for (const row of history) {
+      const rowMonthKey = monthKeyLocal(row.month);
+      if (rowMonthKey === currentMonthKey) {
+        sum += premium.due;
+        currentMonthCounted = true;
+      } else {
+        sum += Number(row.due || 0);
+      }
+    }
+    if (!currentMonthCounted) {
+      sum += premium.due;
+    }
+    return sum;
+  }, [history, premium.due, monthSummary?.month]);
+
   if (loading) return <LoadingOverlay visible />;
 
   return (
@@ -92,8 +111,8 @@ export default function BillTab() {
             <p className="font-extrabold text-accent">{formatCurrencyINR(premium.paid)}</p>
           </div>
           <div>
-            <p className="text-muted">Due</p>
-            <p className="font-extrabold text-red-600">{formatCurrencyINR(premium.due)}</p>
+            <p className="text-muted">Total Due</p>
+            <p className="font-extrabold text-red-600">{formatCurrencyINR(totalDue)}</p>
           </div>
         </div>
 

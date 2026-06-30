@@ -72,16 +72,14 @@ export default function ProfileTab({ onTabChange }) {
       <div className="space-y-4 px-4 -mt-4">
         {/* User Card */}
         <div className="rounded-2xl border border-slate-100 bg-surface p-4 flex items-center gap-4 animate-fade-in">
-          <img
-            src={`https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(memberName)}`}
-            alt=""
-            className="h-16 w-16 rounded-full border-2 border-brand bg-white object-cover"
-          />
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 border-accent/20 bg-accent/10 text-accent">
+            <User className="h-8 w-8" />
+          </div>
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-lg font-extrabold text-ink">{memberName}</h2>
             <div className="mt-1 flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                 {status}
               </span>
             </div>
@@ -103,7 +101,7 @@ export default function ProfileTab({ onTabChange }) {
           </div>
           <div>
             <p className="text-xs text-muted">Due amount</p>
-            <p className={`font-extrabold ${dueAmount > 0 ? "text-red-600" : "text-green-700"}`}>
+            <p className={`font-extrabold ${dueAmount > 0 ? "text-red-600" : "text-blue-600"}`}>
               {formatCurrencyINR(dueAmount)}
             </p>
           </div>

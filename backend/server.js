@@ -30,6 +30,7 @@ const morgan       = require("morgan");
 const { connectDB, closeDB } = require("./config/db");
 const logger       = require("./utils/logger");
 const { startMonthlyBillEmailScheduler } = require("./jobs/monthlyBillEmailJob");
+const { startDueSyncScheduler, stopDueSyncScheduler } = require("./jobs/syncMemberDues");
 
 // ─── 3. App initialisation ────────────────────────────────────────────────
 const app = express();
@@ -174,6 +175,9 @@ const server = app.listen(PORT, async () => {
   // Start scheduled jobs only after DB is confirmed live
   startMonthlyBillEmailScheduler();
   logger.info("Monthly bill email scheduler started.");
+
+  // Auto-calculate and sync MemberMonthlyDue for every active member
+  startDueSyncScheduler();
 });
 
 // ─── 11. Graceful shutdown ─────────────────────────────────────────────────
@@ -202,7 +206,10 @@ async function gracefulShutdown(signal) {
     );
     logger.info("HTTP server closed.");
 
-    // 2. Close MongoDB connection cleanly (prevents reconnect loop in closeDB)
+    // 2. Stop scheduled jobs
+    stopDueSyncScheduler();
+
+    // 3. Close MongoDB connection cleanly (prevents reconnect loop in closeDB)
     await closeDB();
 
     clearTimeout(hardKillTimer);

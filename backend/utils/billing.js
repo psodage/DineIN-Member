@@ -265,9 +265,15 @@ async function calculateMemberBilling(memberId, monthDate) {
   }, 0);
 
   const activeDays = Math.max(0, eligibleDays - approvedEligibleLeaveDays);
-  const mealAmount = Math.max(0, activeDays * dailyRate);
+  
+  // Calculate mealAmount using flat leave deduction rate
+  const leaveDeductionRate = normalizeMealPlanKey(member.mealPlan) === "both" ? 100 : 60;
+  const rawLeaveDeduction = approvedEligibleLeaveDays * leaveDeductionRate;
+  const grossMealAmount = eligibleDays * dailyRate;
+  const leaveDeduction = Math.min(grossMealAmount, rawLeaveDeduction);
+  const mealAmount = Math.round(Math.max(0, grossMealAmount - leaveDeduction));
 
-  const snacksAmount = await calculateSnackTotalForMonth(memberId, range.start);
+  const snacksAmount = Math.round(await calculateSnackTotalForMonth(memberId, range.start));
   // Requirement: monthly due = snacks + meal(activeDays*dailyRate).
   // Keep expenseShare at 0 in this simplified formula.
   const expenseShare = 0;
@@ -282,7 +288,7 @@ async function calculateMemberBilling(memberId, monthDate) {
     .lean();
 
   const paidAmount = payments.reduce((sum, p) => sum + Number(p.paidAmount || 0), 0);
-  const remainingAmount = Math.max(0, totalBill - paidAmount);
+  const remainingAmount = Math.round(Math.max(0, totalBill - paidAmount));
   const status = remainingAmount <= 0 ? "Paid" : "Pending";
 
   return {

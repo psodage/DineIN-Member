@@ -177,7 +177,8 @@ async function calculateExpenseShareForMonth(memberId, monthDate) {
   const effectiveRateByMember = new Map();
 
   for (const m of members) {
-    const dailyRate = Number(mealPriceMap.get(normalizeMealPlanKey(m.mealPlan)) || 0);
+    const monthlyPrice = Number(mealPriceMap.get(normalizeMealPlanKey(m.mealPlan)) || 0);
+    const dailyRate = monthDays > 0 ? monthlyPrice / monthDays : 0;
     // For expense shares, exclude approved leave days from weight as well.
     const { approvedLeaveDayKeys } = await computeApprovedLeaveDayKeysForMonth(
       m._id,
@@ -205,7 +206,9 @@ async function calculateMemberBilling(memberId, monthDate) {
   const member = await Member.findById(memberId).lean();
   if (!member) return null;
   const mealPriceMap = await getMealPlanPriceMap();
-  const dailyRate = Number(mealPriceMap.get(normalizeMealPlanKey(member.mealPlan)) || 0);
+  const daysInMonth = getDaysInMonth(range.start);
+  const monthlyPrice = Number(mealPriceMap.get(normalizeMealPlanKey(member.mealPlan)) || 0);
+  const dailyRate = daysInMonth > 0 ? monthlyPrice / daysInMonth : 0;
 
   // If member joined after the billing window, charge 0.
   if (member.joiningDate && member.joiningDate >= range.endExclusive) {

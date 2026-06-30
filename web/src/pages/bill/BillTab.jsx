@@ -64,7 +64,7 @@ export default function BillTab() {
   return (
     <div className="min-h-dvh bg-white pb-16">
       <header className="safe-top rounded-b-[26px] bg-accent px-5 pb-8 pt-4 text-white">
-        <div className="flex justify-end">
+        <div className="flex justify-end mt-2">
           <button
             type="button"
             onClick={() => navigate("/bill/payments")}

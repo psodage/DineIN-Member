@@ -151,7 +151,9 @@ router.get(
       const snacksAmount = Number(computedDoc?.snacksAmount || 0);
       const expenseShare = Number(computedDoc?.expenseShare || 0);
       const inactiveDays = Number(leaveStat?.inactiveDays || 0);
-      const dailyRate = await getMealPlanPrice(memberDoc?.mealPlan);
+      const monthlyPrice = await getMealPlanPrice(memberDoc?.mealPlan);
+      const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+      const dailyRate = daysInMonth > 0 ? monthlyPrice / daysInMonth : 0;
       const leaveDeductionRate = getLeaveDeductionRate(memberDoc?.mealPlan);
       const mealSummary = buildMealSummary({
         memberDoc,
@@ -225,7 +227,9 @@ router.get(
       const explicitCollected = hasExplicitCollected ? Number(monthlyDueDoc.collected || 0) : 0;
       const totalBill = Number(computedDoc?.totalBill || 0);
       const inactiveDays = Number(leaveStat?.inactiveDays || 0);
-      const dailyRate = await getMealPlanPrice(memberDoc?.mealPlan);
+      const monthlyPrice = await getMealPlanPrice(memberDoc?.mealPlan);
+      const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+      const dailyRate = daysInMonth > 0 ? monthlyPrice / daysInMonth : 0;
       const leaveDeductionRate = getLeaveDeductionRate(memberDoc?.mealPlan);
       const mealSummary = buildMealSummary({
         memberDoc,

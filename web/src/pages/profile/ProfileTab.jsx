@@ -61,25 +61,35 @@ export default function ProfileTab({ onTabChange }) {
 
   return (
     <div className="min-h-dvh bg-white pb-16">
-      <header className="safe-top relative overflow-hidden rounded-b-[28px] bg-gradient-to-br from-accent to-orange-600 px-5 pb-10 pt-4 text-white">
-        <div className="flex items-center gap-4">
+      <header className="safe-top rounded-b-[26px] bg-accent px-5 pb-8 pt-4 text-white">
+        <div className="flex justify-end">
+          <div className="h-7" />
+        </div>
+        <h1 className="mt-2 text-2xl font-extrabold">My Profile</h1>
+        <p className="text-sm text-white/85">Manage your personal account details</p>
+      </header>
+
+      <div className="space-y-4 px-4 -mt-4">
+        {/* User Card */}
+        <div className="rounded-2xl border border-slate-100 bg-surface p-4 flex items-center gap-4 animate-fade-in">
           <img
             src={`https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(memberName)}`}
             alt=""
-            className="h-20 w-20 rounded-full border-2 border-white/80 bg-white"
+            className="h-16 w-16 rounded-full border-2 border-brand bg-white object-cover"
           />
-          <div>
-            <h1 className="text-2xl font-extrabold">{memberName}</h1>
-            <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-xs font-bold">
-              <span className="h-2 w-2 rounded-full bg-green-300" />
-              {status}
-            </span>
-            <p className="mt-2 text-sm text-white/85">Room owner: {member?.roomOwnerName || "N/A"}</p>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-lg font-extrabold text-ink">{memberName}</h2>
+            <div className="mt-1 flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                {status}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-muted">Room owner: {member?.roomOwnerName || "N/A"}</p>
           </div>
         </div>
-      </header>
 
-      <div className="space-y-4 px-4 -mt-6">
+        {/* Profile Details Grid */}
         <div className="rounded-2xl border border-slate-100 bg-surface grid grid-cols-2 gap-3 p-4">
           <div>
             <p className="text-xs text-muted">Meal plan</p>
@@ -106,13 +116,13 @@ export default function ProfileTab({ onTabChange }) {
         {[
           { icon: Pencil, label: "Edit profile", to: "/profile/edit" },
           { icon: KeyRound, label: "Change password", to: "/profile/change-password" },
-          { icon: User, label: "Activity calendar", to: "/activity-calendar" },
+
         ].map(({ icon: Icon, label, to }) => (
           <button
             key={to}
             type="button"
             onClick={() => navigate(to)}
-            className="flex w-full items-center gap-3 rounded-2xl bg-surface p-4 shadow-sm transition hover:bg-slate-100"
+            className="flex w-full items-center gap-3 rounded-2xl border border-slate-100 bg-surface p-4 shadow-sm transition hover:bg-slate-100"
           >
             <Icon className="h-5 w-5 text-accent" />
             <span className="flex-1 text-left font-bold text-ink">{label}</span>
@@ -126,16 +136,22 @@ export default function ProfileTab({ onTabChange }) {
         </Button>
       </div>
 
-      <Modal open={logoutOpen} title="Log out?" onClose={() => setLogoutOpen(false)}>
-        <p className="mb-4">Are you sure you want to log out?</p>
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => setLogoutOpen(false)}>
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={handleLogout}>
-            Log out
-          </Button>
-        </div>
+      <Modal
+        open={logoutOpen}
+        title="Log out?"
+        onClose={() => setLogoutOpen(false)}
+        actions={
+          <>
+            <Button variant="outline" onClick={() => setLogoutOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleLogout}>
+              Log out
+            </Button>
+          </>
+        }
+      >
+        <p className="mb-2">Are you sure you want to log out?</p>
       </Modal>
     </div>
   );

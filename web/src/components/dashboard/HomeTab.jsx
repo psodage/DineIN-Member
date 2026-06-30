@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  BarChart3, Bell, Calendar, Clock, RefreshCw, Utensils,
+  BarChart3, Bell, Calendar, Clock, Menu, RefreshCw, Utensils,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../../lib/api";
@@ -12,6 +12,7 @@ import {
   resolveMealText,
   resolveMenuFromAtMenu,
 } from "./menuUtils";
+import SidebarDrawer from "../layout/SidebarDrawer";
 
 /* ── Brand colours ─────────────────────────────────────────────────────── */
 const HERO_FROM = "#0f8f88";
@@ -85,6 +86,7 @@ export default function HomeTab({ pollRefreshKey }) {
   const { user, logout } = useAuth();
   const hasUnread = Number(user?.notificationCount ?? 0) > 0;
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [menuList, setMenuList] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -182,36 +184,45 @@ export default function HomeTab({ pollRefreshKey }) {
     <>
       <div className="pb-16">
 
-        {/* ── Top bar — greeting & time header ─────────────────── */}
+        {/* ── Top bar — Hamburger, Logo & Notifications ─────────────────── */}
         <div className="safe-top fixed top-0 left-0 right-0 z-30 bg-white border-b border-slate-100 shadow-sm">
           <div className="mx-auto max-w-lg px-4.5 pt-3 pb-2">
-            <div className="flex items-center justify-between">
-              {/* Left side: Greeting + Date & Time */}
-              <div className="min-w-0">
-                <h1 className="text-sm font-extrabold text-ink leading-tight tracking-tight">
-                  {greeting}, {firstName}
-                </h1>
-                <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-muted leading-none">
-                  {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} • {now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                </p>
+            <div className="relative flex items-center justify-between">
+              {/* Left Side: Hamburger Menu */}
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="flex h-8.5 w-8.5 items-center justify-center rounded-full bg-surface border border-slate-100 transition hover:bg-slate-100 active:scale-95 z-10"
+                aria-label="Open menu"
+              >
+                <Menu className="h-4.5 w-4.5 text-slate-600" />
+              </button>
+
+              {/* Center: Logo and Name */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="flex items-center gap-2 pointer-events-auto">
+                  <img src="/logo2.png" alt="DineIN" className="h-7 w-auto" />
+                  <span className="text-lg font-extrabold tracking-wide text-ink">DineIN</span>
+                </div>
               </div>
 
               {/* Right side: Notifications */}
-              <div className="flex items-center gap-2.5 shrink-0">
-                <button
-                  type="button"
-                  aria-label="Notifications"
-                  className="relative flex h-8.5 w-8.5 items-center justify-center rounded-full bg-surface border border-slate-100 transition hover:bg-slate-100 active:scale-95"
-                >
-                  <Bell className="h-4.5 w-4.5 text-slate-600" />
-                  {hasUnread && (
-                    <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent ring-2 ring-white" />
-                  )}
-                </button>
-              </div>
+              <button
+                type="button"
+                aria-label="Notifications"
+                className="relative flex h-8.5 w-8.5 items-center justify-center rounded-full bg-surface border border-slate-100 transition hover:bg-slate-100 active:scale-95 z-10"
+              >
+                <Bell className="h-4.5 w-4.5 text-slate-600" />
+                {hasUnread && (
+                  <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent ring-2 ring-white" />
+                )}
+              </button>
             </div>
           </div>
         </div>
+
+        {/* Sidebar Drawer Component */}
+        <SidebarDrawer isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
         {/* Spacer to offset the fixed header */}
         <div className="safe-top pt-14" />

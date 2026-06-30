@@ -236,16 +236,22 @@ export default function LeaveTab() {
         </Button>
       </div>
 
-      <Modal open={confirmOpen} title="Confirm leave" onClose={() => setConfirmOpen(false)}>
-        <p className="mb-4">Submit a leave request for today?</p>
-        <div className="flex gap-2 justify-end">
-          <Button variant="outline" onClick={() => setConfirmOpen(false)}>
-            Cancel
-          </Button>
-          <Button variant="accent" loading={submitting} onClick={submitLeave}>
-            Confirm
-          </Button>
-        </div>
+      <Modal
+        open={confirmOpen}
+        title="Confirm leave"
+        onClose={() => setConfirmOpen(false)}
+        actions={
+          <>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="accent" loading={submitting} onClick={submitLeave}>
+              Confirm
+            </Button>
+          </>
+        }
+      >
+        <p className="mb-2">Submit a leave request for today?</p>
       </Modal>
 
       <Modal open={!!modal} title={modal?.title} onClose={() => setModal(null)}>

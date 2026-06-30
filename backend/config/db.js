@@ -15,6 +15,13 @@
  */
 
 const mongoose = require("mongoose");
+const dns = require("dns");
+
+// Force DNS resolution to use public DNS servers (Google and Cloudflare)
+// to prevent querySrv ECONNREFUSED issues on systems/networks with buggy DNS.
+if (typeof dns.setServers === "function") {
+  dns.setServers(["8.8.8.8", "1.1.1.1"]);
+}
 
 // ─── Reconnection state ────────────────────────────────────────────────────
 
